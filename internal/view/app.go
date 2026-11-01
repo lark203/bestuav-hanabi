@@ -146,6 +146,16 @@ func (a *App) elementMark(c *ui.Context, size float32) {
 	})
 }
 
+// elementMarkSoft 底部的大标识：参考图里是一枚很淡的花形线稿，
+// 不抢戏——只有淡淡的辉光和半透明线条。
+func (a *App) elementMarkSoft(c *ui.Context, size float32) {
+	ui.Row(c).Width(size).Height(size).Draw(func(p *ui.Painter, r ui.Rect) {
+		cx, cy := r.X+r.W/2, r.Y+r.H/2
+		glow(p, cx, cy, size*0.52, a.tok.Accent, 0.22)
+		glyph(p, a.char.Motif, cx, cy, size*0.38, a.tok.Text, 0.55, 0)
+	})
+}
+
 // sidebar 左侧栏：品牌（元素标识 + 名称）→ 分组标签 → 菜单 → 底部当前角色。
 func (a *App) sidebar(c *ui.Context) {
 	col := ui.Column(c).Width(212)
@@ -153,7 +163,8 @@ func (a *App) sidebar(c *ui.Context) {
 	// 上菜单文字会糊。Clarity 0.15 保留一点通透，但足够托住文字。
 	col.Material(glass.Glass{Style: glass.Regular, Clarity: 0.15})
 	col.Children(func() {
-		ui.Row(c).Padding(16, 12, 10, 20).Gap(12).AlignItems(ui.Center).Children(func() {
+		// 品牌区不贴顶：参考图里图标顶部约占窗口高 8.5%，按 800 高折算约 64px。
+		ui.Row(c).Padding(64, 12, 10, 20).Gap(12).AlignItems(ui.Center).Children(func() {
 			a.elementMark(c, 40)
 			ui.Column(c).Gap(1).Children(func() {
 				ui.Text(c, "HanaBi").FontSize(19).Bold().TextColor(a.tok.Text)
@@ -173,9 +184,10 @@ func (a *App) sidebar(c *ui.Context) {
 
 		ui.Spacer(c)
 
-		// 底部：元素标识 + 身份信息，整体水平居中（参考图里就是居中两行）。
-		ui.Column(c).AlignItems(ui.Center).Gap(7).Padding(0, 16, 0, 26).Children(func() {
-			a.elementMark(c, 34)
+		// 底部：一枚较大的淡色元素标识 + 场景名，整体居中；下缘距窗口底约 6%
+		// （参考图量出来的比例），所以底部留白比菜单侧的 padding 大。
+		ui.Column(c).AlignItems(ui.Center).Gap(8).Padding(0, 16, 0, 46).Children(func() {
+			a.elementMarkSoft(c, 64)
 			ui.Text(c, a.char.Scene).FontSize(11).TextColor(a.tok.TextMuted)
 			ui.Text(c, a.char.SceneEN).FontSize(8.5).TextColor(a.tok.TextFaint)
 		})
@@ -269,28 +281,29 @@ func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func()) 
 	})
 }
 
-// content 内容区：按当前页分发。
+// content 内容区：一块圆角玻璃面板浮在壁纸上，四周留出壁纸的边缘。
 //
-// 整块内容区压一层很淡的暗色：壁纸在这里是最花的一段，标题、筛选条、
-// 卡片说明都直接压在上面，不压一层的话浅色壁纸会把文字吃掉。
+// 之前是整片内容区直接压一层暗色——壁纸从头露到尾，标题和筛选条都泡在
+// 图片里。改成面板后壁纸只在四周和缝隙里透出，文字全部落在面板上。
 // 内容套在 Scroll 里：主题超出可视高度时纵向滚动（状态栏才不会被顶出窗口）。
 func (a *App) content(c *ui.Context) {
-	ui.Column(c).Grow(1).Clip().
-		Draw(func(p *ui.Painter, r ui.Rect) {
-			p.Fill(r, ui.RGBA(6, 11, 18, 0.30), 0)
-		}).
-		Children(func() {
-			ui.Scroll(c).Grow(1).Children(func() {
-				ui.Column(c).Padding(28, 22).Gap(18).Children(func() {
-					switch a.page {
-					case "library":
-						a.libraryPage(c)
-					default:
-						a.placeholderPage(c)
-					}
+	ui.Column(c).Grow(1).Padding(14, 16, 14, 16).Children(func() {
+		ui.Column(c).Grow(1).Radius(14).
+			Material(glass.Glass{Style: glass.Regular, Clarity: 0.12}).
+			Border(1, a.tok.CardStroke).
+			Children(func() {
+				ui.Scroll(c).Grow(1).Children(func() {
+					ui.Column(c).Padding(24, 20).Gap(16).Children(func() {
+						switch a.page {
+						case "library":
+							a.libraryPage(c)
+						default:
+							a.placeholderPage(c)
+						}
+					})
 				})
 			})
-		})
+	})
 }
 
 // statusbar 内容区底部：中间一行品牌小字，右侧是工作空间状态。

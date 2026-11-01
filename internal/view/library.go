@@ -136,6 +136,10 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character) {
 			To:    ui.Transparent,
 			Angle: 180,
 		}, a.tok.Radius)
+		// 顶部内侧 1px 亮线：参考图里每张卡片上缘都有一条细细的高光，
+		// 是「卡片是实体」这个质感的重要来源。
+		p.Fill(ui.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: 1},
+			ui.RGBA(255, 255, 255, 0.16), 0)
 		// 线稿画在右半区，越出卡片的部分由圆角裁掉。
 		p.Clip(r, a.tok.Radius, func() {
 			cardArt(p, ch.Art, ui.Rect{X: r.X + r.W*0.38, Y: r.Y, W: r.W * 0.66, H: r.H},
