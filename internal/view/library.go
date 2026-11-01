@@ -14,9 +14,10 @@ const (
 	pagePadX = 22
 	cardMinW = 280
 	cardGap  = 14
-	// scrollReserve 是给纵向滚动条留的右侧空档（条宽 6 + 透气 4）。
-	// 滚动条是覆盖式绘制，不给内容让位会压住最右卡片的线稿。
-	scrollReserve = 10
+	// scrollReserve 是给纵向滚动条留的右侧空档（条宽 6 + 透气 12）。
+	// 滚动条是覆盖式绘制，不给内容让位会压住最右卡片的线稿；
+	// 10px 视觉上还是太挤，王工要求再拉开一档。
+	scrollReserve = 18
 )
 
 // libraryPage 主题库：标题区 + 元素筛选 + 卡片网格（列数随窗口宽度自适应）。
