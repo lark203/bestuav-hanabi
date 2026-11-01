@@ -62,24 +62,24 @@ func (a *App) setCharacter(id string) {
 	}
 	a.char = c
 	a.tok = c.Tok
+	// 释放上一套的壁纸/头像像素：每张 4K 约 33MB，六套全留着会到 200MB。
+	assets.Keep(c.Bg, c.Icon)
 }
 
 // SetWindow 由 main 注入窗口句柄。
 func (a *App) SetWindow(w *mygo.Window) { a.win = w }
 
-// 壁纸与压暗层。壁纸只解一次（assets 内部缓存），压暗层保证半透明 UI 上文字可读。
+// 壁纸与压暗层。壁纸路径来自当前角色（assets 内部缓存），压暗层保证半透明 UI 上文字可读。
 var (
-	wallpaperPath  = "ganyu/ganyu-bg-4k.jpg"
-	wallpaperShade = ui.RGBA(6, 12, 22, 0.38)
-
 	// 顶部压深带：壁纸上部常有建筑、灯火的亮部，大标题压在上面读不清。
-	// 从顶部 0.55 的黑蓝渐隐到透明（170 DIP 处收干净），既托住标题又不压掉通透感。
+	// 从顶部 0.72 的黑蓝渐隐到透明（190 DIP 处收干净），既托住标题又不压掉通透感。
+	// 强度给得比较高是因为有的壁纸本身就是浅色立绘（纳西妲、八重神子）。
 	topScrim = ui.LinearGradient{
-		From:  ui.RGBA(6, 12, 22, 0.55),
+		From:  ui.RGBA(6, 12, 22, 0.72),
 		To:    ui.Transparent,
 		Angle: 180, // 从上到下
 	}
-	topScrimH = float32(170)
+	topScrimH = float32(190)
 )
 
 // View 每帧构建根视图：壁纸在最底 → 中间区域（侧栏 + 右侧内容）→ 整宽底部状态栏。
@@ -90,13 +90,13 @@ func (a *App) View(c *ui.Context) {
 	// 壁纸画在根容器的 Draw 回调里：它在自身背景之后、子元素之前执行，
 	// 所以 UI 天然压在壁纸上，不需要额外的层叠容器。
 	root := ui.Column(c).Fill().Background(a.tok.WinFill)
-	if bg := assets.Bitmap(wallpaperPath); bg != nil {
+	if bg := assets.Bitmap(a.char.Bg); bg != nil {
 		root = root.Draw(func(p *ui.Painter, r ui.Rect) {
 			// 用帧时间而不是 time.Now()：重绘帧不重建 view，时间也来自同一个时钟。
 			elapsed := p.Now().Sub(a.t0).Seconds()
 			// 着色器驱动：Cover 铺满 + 缓慢流动 + 按角色元素色保亮度染色。
 			wallpaper.Draw(p, bg, r, elapsed, a.animPlay, a.tok.Accent, a.char.WallTint)
-			p.Fill(r, wallpaperShade, 0) // 整体压暗
+			p.Fill(r, ui.RGBA(6, 12, 22, a.char.Scrim), 0) // 按壁纸亮度压暗（见 Character.Scrim）
 
 			// 顶部再压一层渐变，托住标题区（在玻璃条之下，不影响玻璃本身的通透）。
 			p.FillGradient(ui.Rect{X: r.X, Y: r.Y, W: r.W, H: topScrimH}, topScrim, 0)
@@ -129,6 +129,31 @@ func (a *App) View(c *ui.Context) {
 	}
 }
 
+// avatar 画当前角色的头像：有素材用图片，没有就用元素色圆 + 首字占位。
+//
+// 原项目只给了甘雨的角色头像，其余五个角色没有——占位样式让主题切换时
+// 仍能一眼看出换了谁，而不是六个角色共用同一张脸。
+func (a *App) avatar(c *ui.Context, size float32) {
+	if a.char.Icon != "" {
+		if bmp := assets.Bitmap(a.char.Icon); bmp != nil {
+			ui.Image(c, bmp).Width(size).Height(size).Radius(size / 2).Clip()
+			return
+		}
+	}
+	initial := "?"
+	if r := []rune(a.char.NameCN); len(r) > 0 {
+		initial = string(r[0])
+	}
+	// 实心元素色圆 + 深色字。
+	// 早先用的是 AccentSoft（14% 透明度）配 accent 文字：两个都是浅色系，
+	// 压在浅色壁纸上（纳西妲、八重神子的壁纸就是浅色立绘）等于隐形。
+	ui.Row(c).Width(size).Height(size).Radius(size / 2).
+		Background(a.tok.Accent).AlignItems(ui.Center).Justify(ui.Center).
+		Children(func() {
+			ui.Text(c, initial).FontSize(size * 0.46).Bold().TextColor(ui.Hex("#0A1420"))
+		})
+}
+
 // sidebar 左侧栏：品牌（头像 + 双行标题）+ 菜单。
 //
 // 侧栏用 glass.Clear：大面积面板用 Regular 会把壁纸糊得太狠，
@@ -138,9 +163,7 @@ func (a *App) sidebar(c *ui.Context) {
 		Material(glass.Glass{Style: glass.Clear, Clarity: 0.30}).
 		Children(func() {
 			ui.Row(c).Padding(18, 16, 16, 18).Gap(11).AlignItems(ui.Center).Children(func() {
-				if bmp := assets.Bitmap("ganyu/ganyu-icon.png"); bmp != nil {
-					ui.Image(c, bmp).Width(38).Height(38).Radius(19).Clip()
-				}
+				a.avatar(c, 38)
 				ui.Column(c).Gap(1).Children(func() {
 					ui.Text(c, "花火").FontSize(17).Bold().TextColor(a.tok.Text)
 					ui.Text(c, "HANABI UI").FontSize(9).TextColor(a.tok.TextFaint)
@@ -215,9 +238,7 @@ func (a *App) statusbar(c *ui.Context) {
 	ui.Row(c).Height(54).Padding(18, 16).AlignItems(ui.Center).Gap(9).
 		Material(glass.Glass{Style: glass.Clear, Clarity: 0.15}).
 		Children(func() {
-			if bmp := assets.Bitmap("ganyu/ganyu-icon.png"); bmp != nil {
-				ui.Image(c, bmp).Width(22).Height(22).Radius(11).Clip()
-			}
+			a.avatar(c, 22)
 			ui.Column(c).Gap(1).Children(func() {
 				ui.Text(c, a.char.NameCN+" · "+a.char.Element.Label()).FontSize(11).TextColor(a.tok.TextMuted)
 				ui.Text(c, "A GENTLE FIGURE").FontSize(8).TextColor(a.tok.TextFaint)

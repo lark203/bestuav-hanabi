@@ -80,9 +80,20 @@ type Character struct {
 	Motif   Motif
 	Tok     Tokens
 
+	// Bg 是壁纸在 assets/ 下的相对路径（每个角色一张，均从原项目导入）。
+	Bg string
+	// Icon 是头像的相对路径；空表示没有头像素材，界面用元素色圆点占位。
+	Icon string
+
 	// WallTint 是壁纸染色的强度 0..1：0 = 保持原图颜色。
-	// 元素色离壁纸原色越远，这个值要越大才看得出氛围变化。
+	// 各自的壁纸色调已经贴合角色，这里只做轻微统一，通常 0.1~0.2。
 	WallTint float32
+
+	// Scrim 是壁纸上的压暗强度 0..1，保证白字压在上面仍可读。
+	//
+	// 不能所有角色用同一个值：实测平均亮度从甘雨的 0.27 到八重/纳西妲的 0.80，
+	// 同一个 0.38 对前者刚好、对后者等于没压。取值按 0.32+max(0,luma-0.32)×0.55 换算。
+	Scrim float32
 }
 
 // derive 从元素色推导一套暗色令牌：底色用元素色混入近黑，保证始终是深色底。
@@ -98,7 +109,7 @@ func derive(accent ui.Color) Tokens {
 		// 文字都掺一点元素色：整块界面会带角色气质，而不是纯灰白。
 		Text:      accent.Mix(ui.Hex("#FFFFFF"), 0.80),
 		TextMuted: accent.Mix(ui.Hex("#FFFFFF"), 0.44),
-		TextFaint: accent.Mix(ui.Hex("#FFFFFF"), 0.22),
+		TextFaint: accent.Mix(ui.Hex("#FFFFFF"), 0.34),
 
 		Accent:     accent,
 		AccentSoft: accent.Alpha(0.14),
@@ -108,27 +119,41 @@ func derive(accent ui.Color) Tokens {
 }
 
 // all 是所有可用角色。第一条是默认主题。
+//
+// 壁纸与头像都来自 HanaBi-ui-Genshin 的 assets/tex（本地导入，不入库），
+// 目录约定为 assets/<id>/bg.jpg 与可选的 assets/<id>/icon.png。
 var all = []Character{
 	{
 		ID: "ganyu", NameCN: "甘雨", NameEN: "Ganyu",
-		Element: Cryo, Motif: MotifCrystal,
-		WallTint: 0.28, Tok: ganyuTokens(),
+		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
+		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya",
-		Element: Pyro, Motif: MotifFlame,
-		WallTint: 0.62, Tok: yoimiyaTokens(),
+		Element: Pyro, Motif: MotifFlame, WallTint: 0.18, Scrim: 0.47,
+		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
 	},
 	{
-		ID: "raiden", NameCN: "雷电将军", NameEN: "Raiden",
-		Element: Electro, Motif: MotifBolt,
-		WallTint: 0.55, Tok: raidenTokens(),
+		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko",
+		Element: Electro, Motif: MotifBolt, WallTint: 0.15, Scrim: 0.66,
+		Bg: "yae/bg.jpg", Tok: yaeTokens(),
 	},
-	// 以下角色先复用冰晶画法，等有对应素材再补各自 Motif。
-	{ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Element: Dendro, Motif: MotifCrystal, WallTint: 0.55, Tok: derive(ui.Hex("#A8E6A0"))},
-	{ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Element: Hydro, Motif: MotifCrystal, WallTint: 0.32, Tok: derive(ui.Hex("#8FD0FF"))},
-	{ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Element: Anemo, Motif: MotifCrystal, WallTint: 0.52, Tok: derive(ui.Hex("#9EE8D6"))},
-	{ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Element: Geo, Motif: MotifCrystal, WallTint: 0.60, Tok: derive(ui.Hex("#E8C87A"))},
+	// 以下角色有自己的壁纸，但标识先复用冰晶画法，等补了专属 Motif 再换。
+	{
+		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida",
+		Element: Dendro, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.66,
+		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
+	},
+	{
+		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina",
+		Element: Hydro, Motif: MotifCrystal, WallTint: 0.14, Scrim: 0.35,
+		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
+	},
+	{
+		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan",
+		Element: Anemo, Motif: MotifCrystal, WallTint: 0.16, Scrim: 0.47,
+		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
+	},
 }
 
 // All 返回全部角色（顺序即界面顺序）。
@@ -158,7 +183,7 @@ func ganyuTokens() Tokens {
 	t.CardStroke = ui.RGBA(180, 215, 255, 0.20)
 	t.Text = ui.Hex("#E6F2FF")
 	t.TextMuted = ui.Hex("#9FB6D0")
-	t.TextFaint = ui.Hex("#6C819B")
+	t.TextFaint = ui.Hex("#8FA6C4")
 	return t
 }
 
@@ -171,12 +196,12 @@ func yoimiyaTokens() Tokens {
 	t.CardStroke = ui.RGBA(255, 200, 160, 0.22)
 	t.Text = ui.Hex("#FFF0E2")
 	t.TextMuted = ui.Hex("#D6B49B")
-	t.TextFaint = ui.Hex("#9A7A63")
+	t.TextFaint = ui.Hex("#BFA184")
 	return t
 }
 
-// raidenTokens 雷电将军（雷）：紫，文字偏冷白。
-func raidenTokens() Tokens {
+// yaeTokens 八重神子（雷）：紫，文字偏冷白。
+func yaeTokens() Tokens {
 	t := derive(ui.Hex("#C9A6FF"))
 	t.WinFill = ui.RGBA(14, 11, 24, 0.56)
 	t.Sidebar = ui.RGBA(17, 13, 28, 0.44)
@@ -184,7 +209,7 @@ func raidenTokens() Tokens {
 	t.CardStroke = ui.RGBA(210, 190, 255, 0.22)
 	t.Text = ui.Hex("#F0E9FF")
 	t.TextMuted = ui.Hex("#B6A8D4")
-	t.TextFaint = ui.Hex("#7E719A")
+	t.TextFaint = ui.Hex("#A99BC4")
 	return t
 }
 

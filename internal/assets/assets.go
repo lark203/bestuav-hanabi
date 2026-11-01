@@ -82,3 +82,30 @@ func Bitmap(rel string) *ui.Bitmap {
 	cache[rel] = bmp
 	return bmp
 }
+
+// Keep 只保留仍需要的位图，其余的释放像素并移出缓存。
+//
+// 一张 4K 壁纸解码后约 33 MB（3840×2160×4）。六个角色的壁纸全留在缓存里
+// 就是 200 MB 起——切换主题时必须清掉不用的。保留原始文件数据的话
+// （DecodeBitmap 的语义），切回来会重新解码，代价可接受。
+func Keep(keys ...string) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	for rel, bmp := range cache {
+		wanted := false
+		for _, k := range keys {
+			if k == rel {
+				wanted = true
+				break
+			}
+		}
+		if wanted {
+			continue
+		}
+		if bmp != nil {
+			bmp.ReleasePixels()
+		}
+		delete(cache, rel)
+	}
+}
