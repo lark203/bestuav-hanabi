@@ -1,0 +1,49 @@
+package main
+
+// 壁纸：一张静态插画，靠随时间缓慢漂移的 UV 把它"吹活"，
+// 并按当前角色的元素色做保亮度染色——同一张壁纸在不同主题下读出不同氛围。
+//
+// 原项目用 flow-rg 方向场 + wave/phase 三张图驱动，这里先用两层不同频率、
+// 不同相位的正弦叠加——视觉上同样是"低频、连续、无重复感"的流动，
+// 但省掉三张 1920×1080 的采样，CPU 渲染器也扛得住。
+//
+// 位移幅度按图片空间计（不是屏幕空间），所以窗口大小变化时观感一致；
+// 画面下部（近景）权重更大，形成一点景深错觉。
+
+var Time float // 秒，动效时钟
+var Play float // 0..1，动效强度；0 = 完全静止（截图对比与低功耗场景用）
+
+var Tint vec3        // 目标色调（元素色，0..1）
+var TintAmount float // 0 = 原色，1 = 完全染色
+
+func Fragment(dst vec4, pos vec2) vec4 {
+	size := rectSize()
+	img := image0Size()
+
+	// Cover：按较大的那个比例缩放后居中裁切，与 Go 侧 p.Image(bg, r, ui.Cover) 一致。
+	s := max(size.x/img.x, size.y/img.y)
+	off := (size - img*s) * 0.5
+	uv := (pos - off) / s / img // 图片空间的 0..1 坐标
+
+	// 两条低频波：一条横着走、一条斜着走，周期与相位都不同，叠加后不成规律。
+	w1 := sin(uv.x*5.0 + uv.y*1.5 + Time*0.16)
+	w2 := sin(uv.y*7.0 - uv.x*2.0 - Time*0.11)
+
+	// 近景（uv.y 大）漂得多，远景几乎不动。1080p 下远景约 2px、近景约 6px。
+	amp := (0.0020 + 0.0030*uv.y) * Play
+	uv = uv + vec2(w1, w2)*amp
+
+	c := image0Sample(uv * img)
+
+	// 保亮度染色：把原图的明暗重映射到元素色上（类似单色调滤镜）。
+	//
+	// 不能用「原色×系数 + 元素色×亮度」——蓝色像素本身亮度低，乘出来几乎没变化，
+	// 换主题时壁纸看着还是原来的冷蓝。这里先算出元素色自己的亮度，
+	// 再用原图亮度除以它，得到一条以元素色为色度、明暗来自原图的色带。
+	luma := dot(c.rgb, vec3(0.299, 0.587, 0.114))
+	tintLuma := max(dot(Tint, vec3(0.299, 0.587, 0.114)), 0.06)
+	tinted := Tint * (luma / tintLuma)
+	c = vec4(mix(c.rgb, tinted, TintAmount), c.a)
+
+	return c
+}
