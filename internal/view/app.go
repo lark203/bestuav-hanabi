@@ -118,7 +118,6 @@ func (a *App) View(c *ui.Context) {
 			ui.Column(c).Grow(1).Children(func() {
 				a.titlebar(c)
 				a.content(c)
-				ui.Row(c).Height(1).Background(a.tok.CardStroke)
 				a.statusbar(c)
 			})
 		})
@@ -158,7 +157,7 @@ func (a *App) sidebar(c *ui.Context) {
 			a.elementMark(c, 40)
 			ui.Column(c).Gap(1).Children(func() {
 				ui.Text(c, "HanaBi").FontSize(19).Bold().TextColor(a.tok.Text)
-				ui.Text(c, "HANABI UI").FontSize(8.5).TextColor(a.tok.TextFaint)
+				ui.Text(c, a.char.Motto).FontSize(9).TextColor(a.tok.TextFaint)
 			})
 		})
 
@@ -177,9 +176,8 @@ func (a *App) sidebar(c *ui.Context) {
 		// 底部：元素标识 + 身份信息，整体水平居中（参考图里就是居中两行）。
 		ui.Column(c).AlignItems(ui.Center).Gap(7).Padding(0, 16, 0, 26).Children(func() {
 			a.elementMark(c, 34)
-			ui.Text(c, a.char.NameCN+" · "+a.char.Element.Label()).
-				FontSize(11).TextColor(a.tok.TextMuted)
-			ui.Text(c, "HANABI STUDIO").FontSize(8.5).TextColor(a.tok.TextFaint)
+			ui.Text(c, a.char.Scene).FontSize(11).TextColor(a.tok.TextMuted)
+			ui.Text(c, a.char.SceneEN).FontSize(8.5).TextColor(a.tok.TextFaint)
 		})
 	})
 }
@@ -199,6 +197,9 @@ func (a *App) navRow(c *ui.Context, id, label string, icon *ui.SVG) {
 		a.page = id
 	}
 	row.Children(func() {
+		// 选中项左侧的竖杠：参考图里导航选中态的标志（圆角短棒，元素色）。
+		ui.Row(c).Width(3).Height(18).Radius(1.5).
+			Background(a.tok.Accent.Alpha(map[bool]float32{true: 0.95, false: 0}[active]))
 		ui.Icon(c, icon).FontSize(17).TextColor(color)
 		ui.Text(c, label).FontSize(13).TextColor(color).Grow(1)
 		if active {
@@ -297,12 +298,15 @@ func (a *App) content(c *ui.Context) {
 // 它只属于右侧内容列（不通到侧栏），高度也收窄到 34——参考图里它是一条
 // 很轻的信息条，不是一条横贯全屏的横幅。
 func (a *App) statusbar(c *ui.Context) {
+	// 不铺任何材质、不加分隔线：参考图里它只是壁纸上的两行淡字，
+	// 压一层玻璃反而在亮壁纸上亮出一条横带。
 	ui.Row(c).Height(34).Padding(0, 16).AlignItems(ui.Center).
-		Material(glass.Glass{Style: glass.Clear, Clarity: 0.12}).
 		Children(func() {
 			ui.Spacer(c)
-			ui.Text(c, "HANABI / PERSONAL WORKSPACE").FontSize(8.5).TextColor(a.tok.TextFaint)
+			ui.Text(c, "HANABI / PERSONAL WORKSPACE").FontSize(8.5).
+				TextColor(a.tok.TextFaint.Alpha(0.72))
 			ui.Spacer(c)
-			ui.Text(c, "本地工作空间").FontSize(9.5).TextColor(a.tok.TextFaint)
+			ui.Text(c, "本地工作空间").FontSize(9.5).
+				TextColor(a.tok.TextFaint.Alpha(0.80))
 		})
 }

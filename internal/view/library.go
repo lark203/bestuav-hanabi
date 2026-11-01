@@ -162,11 +162,22 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character) {
 
 		ui.Spacer(c)
 
-		ui.Text(c, ch.NameEN).FontSize(23).
+		ui.Text(c, ch.NameEN).FontSize(26).
 			Font("Georgia, Cambria, 'Times New Roman', serif").
 			TextColor(ui.Hex("#F4F7FA"))
-		ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(11).
-			TextColor(ui.RGBA(255, 255, 255, 0.58))
+		ui.Row(c).AlignItems(ui.Center).Gap(7).Children(func() {
+			ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(11).
+				TextColor(ui.RGBA(255, 255, 255, 0.60))
+			// 选中卡的右下角对勾徽章（参考图里也有）：元素色圆 + 深色勾。
+			if active {
+				ui.Row(c).Width(15).Height(15).Draw(func(p *ui.Painter, r ui.Rect) {
+					cx, cy := r.X+r.W/2, r.Y+r.H/2
+					circle(p, cx, cy, r.W/2, ch.Tok.Accent)
+					seg(p, cx-3.2, cy+0.2, cx-0.9, cy+2.6, 1.5, ui.Hex("#0A1420"))
+					seg(p, cx-0.9, cy+2.6, cx+3.4, cy-2.4, 1.5, ui.Hex("#0A1420"))
+				})
+			}
+		})
 	})
 }
 
