@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
 	"bestuav-hanabi/internal/assets"
@@ -158,10 +157,9 @@ func (a *App) elementMarkSoft(c *ui.Context, size float32) {
 
 // sidebar 左侧栏：品牌（元素标识 + 名称）→ 分组标签 → 菜单 → 底部当前角色。
 func (a *App) sidebar(c *ui.Context) {
-	col := ui.Column(c).Width(212)
-	// Regular 在暗模式下会压暗底下的壁纸；Clear 太透，亮壁纸（钟离、纳西妲）
-	// 上菜单文字会糊。Clarity 0.15 保留一点通透，但足够托住文字。
-	col.Material(glass.Glass{Style: glass.Regular, Clarity: 0.15})
+	// 不用 glass 材质：它会画边缘高光，侧栏上下看起来像有白色边框。
+	// 参考图就是一块纯净的半透明深色，直接用令牌色铺底。
+	col := ui.Column(c).Width(212).Background(a.tok.Sidebar)
 	col.Children(func() {
 		// 品牌区不贴顶：参考图里图标顶部约占窗口高 8.5%，按 800 高折算约 64px。
 		ui.Row(c).Padding(64, 12, 10, 20).Gap(12).AlignItems(ui.Center).Children(func() {
@@ -186,7 +184,7 @@ func (a *App) sidebar(c *ui.Context) {
 
 		// 底部：一枚较大的淡色元素标识 + 场景名，整体居中；下缘距窗口底约 6%
 		// （参考图量出来的比例），所以底部留白比菜单侧的 padding 大。
-		ui.Column(c).AlignItems(ui.Center).Gap(8).Padding(0, 16, 0, 46).Children(func() {
+		ui.Column(c).AlignItems(ui.Center).Gap(8).Padding(0, 16, 46, 16).Children(func() {
 			a.elementMarkSoft(c, 64)
 			ui.Text(c, a.char.Scene).FontSize(11).TextColor(a.tok.TextMuted)
 			ui.Text(c, a.char.SceneEN).FontSize(8.5).TextColor(a.tok.TextFaint)
@@ -281,29 +279,25 @@ func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func()) 
 	})
 }
 
-// content 内容区：一块圆角玻璃面板浮在壁纸上，四周留出壁纸的边缘。
+// content 内容区：按当前页分发。
 //
-// 之前是整片内容区直接压一层暗色——壁纸从头露到尾，标题和筛选条都泡在
-// 图片里。改成面板后壁纸只在四周和缝隙里透出，文字全部落在面板上。
-// 内容套在 Scroll 里：主题超出可视高度时纵向滚动（状态栏才不会被顶出窗口）。
+// 只压一层很淡的暗色托文字，不再包整块面板——参考图里内容是直接浮在
+// 壁纸上的，只有卡片本身是一块块玻璃。
 func (a *App) content(c *ui.Context) {
-	ui.Column(c).Grow(1).Padding(14, 16, 14, 16).Children(func() {
-		ui.Column(c).Grow(1).Radius(14).
-			Material(glass.Glass{Style: glass.Regular, Clarity: 0.12}).
-			Border(1, a.tok.CardStroke).
-			Children(func() {
-				ui.Scroll(c).Grow(1).Children(func() {
-					ui.Column(c).Padding(24, 20).Gap(16).Children(func() {
-						switch a.page {
-						case "library":
-							a.libraryPage(c)
-						default:
-							a.placeholderPage(c)
-						}
-					})
-				})
+	ui.Column(c).Grow(1).Clip().
+		Draw(func(p *ui.Painter, r ui.Rect) {
+			p.Fill(r, ui.RGBA(6, 11, 18, 0.28), 0)
+		}).
+		Children(func() {
+			ui.Column(c).Padding(24, 22).Gap(16).Children(func() {
+				switch a.page {
+				case "library":
+					a.libraryPage(c)
+				default:
+					a.placeholderPage(c)
+				}
 			})
-	})
+		})
 }
 
 // statusbar 内容区底部：中间一行品牌小字，右侧是工作空间状态。

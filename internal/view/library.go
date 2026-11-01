@@ -12,6 +12,7 @@ import (
 //
 // 页面里没有任何角色名或颜色常量——全部来自 theme.All()。
 func (a *App) libraryPage(c *ui.Context) {
+	// 标题与筛选条固定不动，只有下面的卡片滚动（参考图行为）。
 	a.pageHeader(c)
 	a.elementFilter(c)
 
@@ -23,14 +24,18 @@ func (a *App) libraryPage(c *ui.Context) {
 		}
 	}
 
-	const cols = 3
-	for i := 0; i < len(shown); i += cols {
-		ui.Row(c).Gap(14).AlignItems(ui.Start).Children(func() {
-			for j := i; j < i+cols && j < len(shown); j++ {
-				a.characterCard(c, shown[j])
+	ui.Scroll(c).Grow(1).Children(func() {
+		ui.Column(c).Padding(4, 0, 10, 0).Gap(14).Children(func() {
+			const cols = 3
+			for i := 0; i < len(shown); i += cols {
+				ui.Row(c).Gap(14).AlignItems(ui.Start).Children(func() {
+					for j := i; j < i+cols && j < len(shown); j++ {
+						a.characterCard(c, shown[j])
+					}
+				})
 			}
 		})
-	}
+	})
 }
 
 // pageHeader 标题行：大标题 + 英文小标 + 副标题，右上角是分段控件。
@@ -169,16 +174,16 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character) {
 		ui.Text(c, ch.NameEN).FontSize(26).
 			Font("Georgia, Cambria, 'Times New Roman', serif").
 			TextColor(ui.Hex("#F4F7FA"))
+		// 对勾徽章贴卡片最右边（参考图位置）：文字 Grow(1) 顶开。
 		ui.Row(c).AlignItems(ui.Center).Gap(7).Children(func() {
 			ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(11).
-				TextColor(ui.RGBA(255, 255, 255, 0.60))
-			// 选中卡的右下角对勾徽章（参考图里也有）：元素色圆 + 深色勾。
+				TextColor(ui.RGBA(255, 255, 255, 0.60)).Grow(1)
 			if active {
-				ui.Row(c).Width(15).Height(15).Draw(func(p *ui.Painter, r ui.Rect) {
+				ui.Row(c).Width(16).Height(16).Draw(func(p *ui.Painter, r ui.Rect) {
 					cx, cy := r.X+r.W/2, r.Y+r.H/2
 					circle(p, cx, cy, r.W/2, ch.Tok.Accent)
-					seg(p, cx-3.2, cy+0.2, cx-0.9, cy+2.6, 1.5, ui.Hex("#0A1420"))
-					seg(p, cx-0.9, cy+2.6, cx+3.4, cy-2.4, 1.5, ui.Hex("#0A1420"))
+					seg(p, cx-3.4, cy+0.2, cx-1.0, cy+2.8, 1.6, ui.Hex("#0A1420"))
+					seg(p, cx-1.0, cy+2.8, cx+3.6, cy-2.6, 1.6, ui.Hex("#0A1420"))
 				})
 			}
 		})
