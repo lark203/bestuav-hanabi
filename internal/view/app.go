@@ -2,7 +2,6 @@
 package view
 
 import (
-	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -111,15 +110,18 @@ func (a *App) View(c *ui.Context) {
 	}
 
 	root.Children(func() {
-		ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
+		// 状态栏放在右侧内容列里，不横穿侧栏——侧栏一直通到窗口底部，
+		// 「本地工作空间」属于内容区（参考图就是这样）。
+		ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 			a.sidebar(c)
 			ui.Row(c).Width(1).Background(a.tok.CardStroke)
 			ui.Column(c).Grow(1).Children(func() {
 				a.titlebar(c)
 				a.content(c)
+				ui.Row(c).Height(1).Background(a.tok.CardStroke)
+				a.statusbar(c)
 			})
 		})
-		a.statusbar(c)
 	})
 
 	// 开场：主界面照常构建，开场作为绝对定位的一层压在上面，随进度淡出。
@@ -172,15 +174,12 @@ func (a *App) sidebar(c *ui.Context) {
 
 		ui.Spacer(c)
 
-		// 底部：当前角色的大标识 + 名字，与顶部形成呼应。
-		ui.Column(c).Padding(16, 12, 18, 20).Gap(9).Children(func() {
-			a.elementMark(c, 52)
-			ui.Column(c).Gap(1).Children(func() {
-				ui.Text(c, a.char.NameCN+" · "+a.char.Element.Label()).
-					FontSize(11).TextColor(a.tok.TextMuted)
-				ui.Text(c, strings.ToUpper(a.char.NameEN)).
-					FontSize(8).TextColor(a.tok.TextFaint)
-			})
+		// 底部：元素标识 + 身份信息，整体水平居中（参考图里就是居中两行）。
+		ui.Column(c).AlignItems(ui.Center).Gap(7).Padding(0, 16, 0, 26).Children(func() {
+			a.elementMark(c, 34)
+			ui.Text(c, a.char.NameCN+" · "+a.char.Element.Label()).
+				FontSize(11).TextColor(a.tok.TextMuted)
+			ui.Text(c, "HANABI STUDIO").FontSize(8.5).TextColor(a.tok.TextFaint)
 		})
 	})
 }
@@ -215,7 +214,7 @@ func (a *App) navRow(c *ui.Context, id, label string, icon *ui.SVG) {
 // 系统标题栏与窗口按钮已由 main.go 关掉（TitleBarHidden + HideWindowButtons），
 // 否则会和我们这一条叠成两层。双击标题栏最大化由 DragWindow 自带。
 func (a *App) titlebar(c *ui.Context) {
-	bar := ui.Row(c).Height(40).Padding(10, 8).AlignItems(ui.Center).Gap(4)
+	bar := ui.Row(c).Height(40).Padding(0, 10).AlignItems(ui.Center).Gap(4)
 	bar.Children(func() {
 		ui.Spacer(c)
 		a.winButton(c, icons.Minimize, "最小化", func() {
@@ -240,6 +239,14 @@ func (a *App) titlebar(c *ui.Context) {
 		})
 	})
 	bar.DragWindow()
+
+	// 标题栏中间的工作室小标：用 DrawOver 精确居中，
+	// 不影响左右两端的布局（右侧是窗口按钮）。
+	bar.DrawOver(func(p *ui.Painter, r ui.Rect) {
+		const label = "HANABI / STUDIO"
+		w, h := p.MeasureText(0, ui.Span{Text: label, Size: 9})
+		p.Text(r.X+(r.W-w)/2, r.Y+(r.H-h)/2, label, 9, a.tok.TextFaint)
+	})
 }
 
 // winButton 是一个窗口控件按钮：悬停变亮，点击执行 action。
@@ -262,29 +269,40 @@ func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func()) 
 }
 
 // content 内容区：按当前页分发。
+//
+// 整块内容区压一层很淡的暗色：壁纸在这里是最花的一段，标题、筛选条、
+// 卡片说明都直接压在上面，不压一层的话浅色壁纸会把文字吃掉。
+// 内容套在 Scroll 里：主题超出可视高度时纵向滚动（状态栏才不会被顶出窗口）。
 func (a *App) content(c *ui.Context) {
-	ui.Column(c).Grow(1).Clip().Children(func() {
-		ui.Column(c).Padding(28, 22).Gap(18).Children(func() {
-			switch a.page {
-			case "library":
-				a.libraryPage(c)
-			default:
-				a.placeholderPage(c)
-			}
+	ui.Column(c).Grow(1).Clip().
+		Draw(func(p *ui.Painter, r ui.Rect) {
+			p.Fill(r, ui.RGBA(6, 11, 18, 0.30), 0)
+		}).
+		Children(func() {
+			ui.Scroll(c).Grow(1).Children(func() {
+				ui.Column(c).Padding(28, 22).Gap(18).Children(func() {
+					switch a.page {
+					case "library":
+						a.libraryPage(c)
+					default:
+						a.placeholderPage(c)
+					}
+				})
+			})
 		})
-	})
 }
 
-// statusbar 整宽底部：中间一行品牌小字，右侧是工作空间状态。
+// statusbar 内容区底部：中间一行品牌小字，右侧是工作空间状态。
 //
-// 角色信息已经挪到侧栏底部（原版就是这样），这里只留一条低调的横条。
+// 它只属于右侧内容列（不通到侧栏），高度也收窄到 34——参考图里它是一条
+// 很轻的信息条，不是一条横贯全屏的横幅。
 func (a *App) statusbar(c *ui.Context) {
-	ui.Row(c).Height(44).Padding(18, 16).AlignItems(ui.Center).
-		Material(glass.Glass{Style: glass.Clear, Clarity: 0.15}).
+	ui.Row(c).Height(34).Padding(0, 16).AlignItems(ui.Center).
+		Material(glass.Glass{Style: glass.Clear, Clarity: 0.12}).
 		Children(func() {
 			ui.Spacer(c)
-			ui.Text(c, "HANABI / PERSONAL WORKSPACE").FontSize(9).TextColor(a.tok.TextFaint)
+			ui.Text(c, "HANABI / PERSONAL WORKSPACE").FontSize(8.5).TextColor(a.tok.TextFaint)
 			ui.Spacer(c)
-			ui.Text(c, "本地工作空间").FontSize(10).TextColor(a.tok.TextFaint)
+			ui.Text(c, "本地工作空间").FontSize(9.5).TextColor(a.tok.TextFaint)
 		})
 }

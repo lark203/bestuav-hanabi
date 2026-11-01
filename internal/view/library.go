@@ -5,7 +5,6 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/assets"
 	"bestuav-hanabi/internal/theme"
 )
 
@@ -26,7 +25,7 @@ func (a *App) libraryPage(c *ui.Context) {
 
 	const cols = 3
 	for i := 0; i < len(shown); i += cols {
-		ui.Row(c).Gap(14).Children(func() {
+		ui.Row(c).Gap(14).AlignItems(ui.Start).Children(func() {
 			for j := i; j < i+cols && j < len(shown); j++ {
 				a.characterCard(c, shown[j])
 			}
@@ -52,7 +51,7 @@ func (a *App) pageHeader(c *ui.Context) {
 // segmented 画一个分段控件（当前只有第一段是可用页，第二段是占位）。
 func (a *App) segmented(c *ui.Context, items []string, active int) {
 	row := ui.Row(c).Padding(3).Radius(10).Gap(2).
-		Background(ui.RGBA(255, 255, 255, 0.07))
+		Background(ui.RGBA(8, 14, 24, 0.42))
 	row.Children(func() {
 		for i, it := range items {
 			on := i == active
@@ -84,7 +83,7 @@ func (a *App) elementFilter(c *ui.Context) {
 	}
 
 	row := ui.Row(c).Height(40).Padding(4).Radius(10).AlignItems(ui.Center).Gap(2).
-		Background(ui.RGBA(255, 255, 255, 0.05))
+		Background(ui.RGBA(8, 14, 24, 0.42))
 	row.Children(func() {
 		ui.Text(c, "元素").FontSize(10).TextColor(a.tok.TextFaint).Padding(0, 10)
 
@@ -117,82 +116,58 @@ func (a *App) filterChip(c *ui.Context, label string, on bool, onClick func()) {
 	})
 }
 
-// characterCard 单张角色卡片：壁纸缩略图铺底，左上角元素标识，中间英文名，
-// 底部「中文名·属性」；当前主题用元素色描边并在右下角打勾。
+// characterCard 单张角色卡片：纯色底 + 右侧专属线稿，左上角元素标识，
+// 中间英文名，底部「中文名·属性」；当前主题加元素色描边。
+//
+// 为什么不用壁纸缩略图：一张 4K 插画缩到 246×142 只剩一团色块，
+// 七张并排时彼此难分；纯色 + 线稿既保证一排卡片色彩分明，也让每张有图形记忆点。
 func (a *App) characterCard(c *ui.Context, ch theme.Character) {
 	active := ch.ID == a.char.ID
 
-	card := ui.Column(c).Width(246).Height(150).Padding(13).
-		Radius(a.tok.Radius).Border(1, a.tok.CardStroke)
-	if active {
-		card.Border(1.6, ch.Tok.Accent)
-		card.Draw(func(p *ui.Painter, r ui.Rect) {
-			a.cardBacking(p, r, ch)
-			// 选中态：元素色薄罩一层
-			p.Fill(r, ch.Tok.Accent.Alpha(0.10), a.tok.Radius)
+	// Grow 占满一行；MaxWidth 兜住「最后一行只有一张卡片被拉通栏」的情况。
+	card := ui.Column(c).Grow(1).MaxWidth(330).Height(142).Padding(15, 14).
+		Radius(a.tok.Radius).Border(1, ui.RGBA(255, 255, 255, 0.10)).
+		Background(ch.CardBg)
+
+	card.Draw(func(p *ui.Painter, r ui.Rect) {
+		// 顶部提亮一点点：纯色平涂会显得发闷，一层自上而下的微光就够了。
+		p.FillGradient(r, ui.LinearGradient{
+			From:  ui.RGBA(255, 255, 255, 0.07),
+			To:    ui.Transparent,
+			Angle: 180,
+		}, a.tok.Radius)
+		// 线稿画在右半区，越出卡片的部分由圆角裁掉。
+		p.Clip(r, a.tok.Radius, func() {
+			cardArt(p, ch.Art, ui.Rect{X: r.X + r.W*0.38, Y: r.Y, W: r.W * 0.66, H: r.H},
+				ch.Tok.Accent)
 		})
-	} else {
-		card.Draw(func(p *ui.Painter, r ui.Rect) { a.cardBacking(p, r, ch) })
-		if card.Hovered() {
-			card.Border(1.4, ch.Tok.Accent.Alpha(0.8))
-		}
+	})
+
+	switch {
+	case active:
+		card.Border(2, ch.Tok.Accent)
+	case card.Hovered():
+		card.Border(1.4, ch.Tok.Accent.Alpha(0.75))
 	}
 	if card.Clicked() {
 		a.setCharacter(ch.ID)
 	}
 
 	card.Children(func() {
-		ui.Row(c).AlignItems(ui.Start).Children(func() {
-			// 左上：元素标识
-			ui.Row(c).Width(36).Height(36).Draw(func(p *ui.Painter, r ui.Rect) {
-				cx, cy := r.X+r.W/2, r.Y+r.H/2
-				glow(p, cx, cy, r.W*0.62, ch.Tok.Accent, 0.55)
-				glyph(p, ch.Motif, cx, cy, r.W*0.36, ch.Tok.Accent, 1, 0)
-			})
-			ui.Spacer(c)
-			// 右上：同一个标识放大、极淡，当装饰纹样用
-			ui.Row(c).Width(58).Height(58).Draw(func(p *ui.Painter, r ui.Rect) {
-				glyph(p, ch.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.40,
-					ui.Hex("#FFFFFF"), 0.24, 1)
-			})
+		// 左上：元素标识（小尺寸，不抢英文名）
+		ui.Row(c).Width(22).Height(22).Draw(func(p *ui.Painter, r ui.Rect) {
+			glyph(p, ch.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.40,
+				ch.Tok.Accent, 0.95, 0)
 		})
 
 		ui.Spacer(c)
 
-		ui.Text(c, ch.NameEN).FontSize(22).TextColor(ui.Hex("#FFFFFF"))
+		ui.Text(c, ch.NameEN).FontSize(23).
+			Font("Georgia, Cambria, 'Times New Roman', serif").
+			TextColor(ui.Hex("#F4F7FA"))
 		ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(11).
-			TextColor(ui.RGBA(255, 255, 255, 0.72))
-
-		if active {
-			// 右下角的勾：一圈元素色 + 两条线
-			ui.Row(c).Height(0).DrawOver(func(p *ui.Painter, r ui.Rect) {
-				cx, cy := r.X+r.W-13, r.Y+r.H-13
-				circle(p, cx, cy, 8, ch.Tok.Accent.Alpha(0.95))
-				seg(p, cx-3.4, cy+0.2, cx-0.9, cy+2.8, 1.7, ui.Hex("#0A1420"))
-				seg(p, cx-0.9, cy+2.8, cx+3.6, cy-2.6, 1.7, ui.Hex("#0A1420"))
-			})
-		}
+			TextColor(ui.RGBA(255, 255, 255, 0.58))
 	})
-}
-
-// cardBacking 画卡片底：壁纸缩略图 + 压暗 + 底部渐变（保证英文名可读）。
-func (a *App) cardBacking(p *ui.Painter, r ui.Rect, ch theme.Character) {
-	b := assets.Thumb(ch.Bg, 360)
-	if b == nil {
-		p.Fill(r, a.tok.Card, a.tok.Radius)
-		return
-	}
-	p.Clip(r, a.tok.Radius, func() {
-		p.Image(b, r, ui.Cover)
-	})
-	p.Fill(r, ui.RGBA(6, 10, 16, 0.55), a.tok.Radius)
-	// 下半部再压一层，让大号英文名压得住亮壁纸
-	p.FillGradient(ui.Rect{X: r.X, Y: r.Y + r.H*0.42, W: r.W, H: r.H * 0.58},
-		ui.LinearGradient{
-			From:  ui.RGBA(6, 10, 16, 0.14),
-			To:    ui.RGBA(6, 10, 16, 0.74),
-			Angle: 180,
-		}, 0)
 }
 
 // motifName 是标识画法的中文说明。
