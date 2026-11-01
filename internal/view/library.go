@@ -14,6 +14,9 @@ const (
 	pagePadX = 22
 	cardMinW = 280
 	cardGap  = 14
+	// scrollReserve 是给纵向滚动条留的右侧空档（条宽 6 + 透气 4）。
+	// 滚动条是覆盖式绘制，不给内容让位会压住最右卡片的线稿。
+	scrollReserve = 10
 )
 
 // libraryPage 主题库：标题区 + 元素筛选 + 卡片网格（列数随窗口宽度自适应）。
@@ -36,7 +39,7 @@ func (a *App) libraryPage(c *ui.Context) {
 	// 窗口变宽列数变多、变窄列数变少，始终没有右侧的空档。
 	// 2~4 列：以卡片最小舒适宽度约 280 DIP 划档。
 	w, _ := c.Size()
-	avail := w - sidebarW - 1 - pagePadX*2
+	avail := w - sidebarW - 1 - pagePadX*2 - scrollReserve
 	cols := int((avail + cardGap) / (cardMinW + cardGap))
 	if cols < 2 {
 		cols = 2
@@ -49,7 +52,8 @@ func (a *App) libraryPage(c *ui.Context) {
 	cardW := (avail - cardGap*float32(cols-1)) / float32(cols)
 
 	ui.Scroll(c).Grow(1).Children(func() {
-		ui.Column(c).Padding(4, 0, 10, 0).Gap(cardGap).Children(func() {
+		// 右侧让出滚动条的宽度：条覆盖绘制，卡片不能伸到它底下。
+		ui.Column(c).Padding(4, scrollReserve, 10, 0).Gap(cardGap).Children(func() {
 			for i := 0; i < len(shown); i += cols {
 				ui.Row(c).Gap(cardGap).AlignItems(ui.Start).Children(func() {
 					for j := i; j < i+cols && j < len(shown); j++ {
