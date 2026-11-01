@@ -1,9 +1,9 @@
 package view
 
 import (
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/assets"
 	"bestuav-hanabi/internal/theme"
 )
 
@@ -26,20 +26,33 @@ func (a *App) libraryPage(c *ui.Context) {
 	}
 }
 
-// characterCard 单张角色卡片：毛玻璃底 + 元素色点，当前主题用元素色描边并加 tint。
+// characterCard 单张角色卡片：用该角色的壁纸做缩略图，压暗后叠文字。
+//
+// 主题库的卡片不追求"玻璃感"，而是要让人一眼看出这套主题长什么样——
+// 所以缩略图铺底，比半透明玻璃更能表达差异。
 func (a *App) characterCard(c *ui.Context, ch theme.Character) {
 	active := ch.ID == a.char.ID
 
-	// 毛玻璃材质：玻璃的底是壁纸，所以"选中"只能靠 Tint 与描边表达，不能换底色。
-	m := glass.Glass{Style: glass.Regular, Clarity: 0.45}
-	if active {
-		m.Tint = ch.Tok.Accent.Alpha(0.22)
-	}
 	card := ui.Column(c).Width(246).Height(136).Padding(16).Gap(8).
-		Radius(a.tok.Radius).Material(m).Border(1, a.tok.CardStroke)
+		Radius(a.tok.Radius).Background(a.tok.Card).Border(1, a.tok.CardStroke)
+
+	// 缩略图在自身背景之后、子元素之前绘制：先 Cover 裁切铺满，再压暗 + 元素色薄染。
+	card.Draw(func(p *ui.Painter, r ui.Rect) {
+		b := assets.Thumb(ch.Bg, 360)
+		if b == nil {
+			return
+		}
+		p.Clip(r, a.tok.Radius, func() {
+			p.Image(b, r, ui.Cover)
+		})
+		// 压暗：卡片上的文字必须能读（有的壁纸是浅色立绘）。
+		p.Fill(r, ui.RGBA(8, 12, 20, 0.72), a.tok.Radius)
+		// 元素色薄一层，六张卡片各有各的调子。
+		p.Fill(r, ch.Tok.Accent.Alpha(0.16), a.tok.Radius)
+	})
+
 	if card.Hovered() && !active {
-		m.Tint = ch.Tok.Accent.Alpha(0.15)
-		card.Material(m)
+		card.Border(1, ch.Tok.Accent.Alpha(0.75))
 	}
 	if active {
 		card.Border(1.5, ch.Tok.Accent)
@@ -50,16 +63,16 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character) {
 
 	card.Children(func() {
 		ui.Row(c).Gap(9).AlignItems(ui.Center).Children(func() {
-			// 元素色点：一眼看出这套主题的强调色。
 			ui.Row(c).Width(10).Height(10).Radius(5).Background(ch.Tok.Accent)
-			ui.Text(c, ch.NameCN).FontSize(17).Bold().TextColor(a.tok.Text)
+			ui.Text(c, ch.NameCN).FontSize(17).Bold().TextColor(ui.Hex("#FFFFFF"))
 			if active {
 				ui.Text(c, "当前").FontSize(9).TextColor(ch.Tok.Accent)
 			}
 		})
 		ui.Text(c, ch.Element.Label()).FontSize(11).TextColor(ch.Tok.Accent)
 		ui.Spacer(c)
-		ui.Text(c, "开场 6.2s · "+motifName(ch.Motif)).FontSize(10).TextColor(a.tok.TextFaint)
+		ui.Text(c, "开场 6.2s · "+motifName(ch.Motif)).FontSize(10).
+			TextColor(ui.RGBA(255, 255, 255, 0.62))
 	})
 }
 

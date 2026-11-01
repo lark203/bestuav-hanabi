@@ -5,6 +5,11 @@
 package assets
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	_ "image/jpeg"
+	_ "image/png"
 	"os"
 	"path/filepath"
 	"sync"
@@ -58,6 +63,9 @@ func findAssetsDir() string {
 var (
 	mu    sync.Mutex
 	cache = map[string]*ui.Bitmap{}
+	// thumbs 单独一张缓存：缩略图体积小（每张几百 KB），可以长期留着，
+	// 主题库要同时显示六个角色，不能为此解码六张 4K 原图。
+	thumbs = map[string]*ui.Bitmap{}
 )
 
 // Bitmap 返回 assets/<rel> 解码后的位图，失败返回 nil（并记住失败，不重试）。
@@ -81,6 +89,34 @@ func Bitmap(rel string) *ui.Bitmap {
 	}
 	cache[rel] = bmp
 	return bmp
+}
+
+// Thumb 返回 assets/<rel> 的缩略图（宽度至多 maxW），失败返回 nil。
+//
+// 自己解码再降采样，而不是先 Bitmap 再缩放：缩略图只需要小尺寸，
+// 没必要为此把 4K 图整张解码进内存。
+func Thumb(rel string, maxW int) *ui.Bitmap {
+	mu.Lock()
+	defer mu.Unlock()
+
+	key := rel + "@" + itoa(maxW)
+	if b, ok := thumbs[key]; ok {
+		return b
+	}
+
+	data, err := os.ReadFile(filepath.Join(assetsDir, rel))
+	if err != nil {
+		thumbs[key] = nil
+		return nil
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		thumbs[key] = nil
+		return nil
+	}
+	b := ui.NewBitmap(scaleDown(img, maxW))
+	thumbs[key] = b
+	return b
 }
 
 // Keep 只保留仍需要的位图，其余的释放像素并移出缓存。
@@ -108,4 +144,70 @@ func Keep(keys ...string) {
 		}
 		delete(cache, rel)
 	}
+}
+
+// scaleDown 用盒式平均把图缩到宽度 maxW（保持比例）。
+//
+// 只用在一处：主题库缩略图。降采样的质量在这里够用，也不想为此引入依赖。
+// image.RGBA 是预乘 alpha，At() 给出的也是预乘值，逐通道平均后写回即可。
+func scaleDown(src image.Image, maxW int) *image.RGBA {
+	b := src.Bounds()
+	sw, sh := b.Dx(), b.Dy()
+	if sw == 0 || sh == 0 {
+		return image.NewRGBA(image.Rect(0, 0, 1, 1))
+	}
+	if maxW > sw {
+		maxW = sw
+	}
+	w := maxW
+	h := sh * w / sw
+	if h < 1 {
+		h = 1
+	}
+
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		y0 := b.Min.Y + y*sh/h
+		y1 := b.Min.Y + (y+1)*sh/h
+		if y1 <= y0 {
+			y1 = y0 + 1
+		}
+		for x := 0; x < w; x++ {
+			x0 := b.Min.X + x*sw/w
+			x1 := b.Min.X + (x+1)*sw/w
+			if x1 <= x0 {
+				x1 = x0 + 1
+			}
+			var sr, sg, sb, sa, n uint64
+			for yy := y0; yy < y1; yy++ {
+				for xx := x0; xx < x1; xx++ {
+					r, g, bl, a := src.At(xx, yy).RGBA()
+					sr, sg, sb, sa = sr+uint64(r), sg+uint64(g), sb+uint64(bl), sa+uint64(a)
+					n++
+				}
+			}
+			if n == 0 {
+				continue
+			}
+			dst.SetRGBA(x, y, color.RGBA{
+				R: uint8(sr / n >> 8), G: uint8(sg / n >> 8),
+				B: uint8(sb / n >> 8), A: uint8(sa / n >> 8),
+			})
+		}
+	}
+	return dst
+}
+
+func itoa(v int) string {
+	if v == 0 {
+		return "0"
+	}
+	var b [8]byte
+	i := len(b)
+	for v > 0 {
+		i--
+		b[i] = byte('0' + v%10)
+		v /= 10
+	}
+	return string(b[i:])
 }
