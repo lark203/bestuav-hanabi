@@ -289,7 +289,10 @@ func (a *App) content(c *ui.Context) {
 			p.Fill(r, ui.RGBA(6, 11, 18, 0.28), 0)
 		}).
 		Children(func() {
-			ui.Column(c).Padding(24, 22).Gap(16).Children(func() {
+			// Grow(1) 必须加：Scroll 只在「父容器高度有界」时才滚动——
+			// 这层不带 Grow 的话它按内容自然长高，Scroll 拿到无限高度，
+			// 最后一行卡片直接被外层 Clip 裁掉、滚轮无反应（踩过）。
+			ui.Column(c).Grow(1).Padding(24, 22).Gap(16).Children(func() {
 				switch a.page {
 				case "library":
 					a.libraryPage(c)
