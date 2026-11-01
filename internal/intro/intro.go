@@ -172,10 +172,11 @@ func (in *Intro) Pose(dockX, dockY float32) MarkPose {
 	// 成形瞬间的缩放脉冲：先微收、再弹大、回落，对应 1.45→4.18s 那段。
 	impact := 1 - 0.025*Smooth(t, 3.33, 3.58) + 0.065*Smooth(t, 3.58, 3.78) - 0.040*Smooth(t, 3.78, 4.18)
 
-	// 停靠走一条抛物线，避免直线平移显得机械。
-	arc := sin32(math.Pi * dock)
+	// 直线飞向品牌位：标识一路缩小，落进品牌位即交接。
+	// 之前这里有一条向上拱的抛物线（避免直线平移显得机械），但实测它会
+	// 先掠过品牌位上方再折回来——王工要求直接落到品牌处，去掉。
 	x := lerp(sx, dockX, dock)
-	y := lerp(sy, dockY, dock) - in.H*0.055*arc*arc
+	y := lerp(sy, dockY, dock)
 
 	return MarkPose{
 		X:       x,

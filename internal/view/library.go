@@ -227,6 +227,12 @@ func motifName(m theme.Motif) string {
 		return "雷光标识"
 	case theme.MotifGeo:
 		return "岩印标识"
+	case theme.MotifLeaf:
+		return "草叶标识"
+	case theme.MotifWave:
+		return "水珠标识"
+	case theme.MotifWind:
+		return "风纹标识"
 	default:
 		return "冰晶标识"
 	}

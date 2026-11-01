@@ -73,6 +73,12 @@ const (
 	MotifBolt
 	// MotifGeo 岩：六边形岩印 + 内嵌菱形。
 	MotifGeo
+	// MotifLeaf 草：三片尖叶成扇形展开 + 短茎。
+	MotifLeaf
+	// MotifWave 水：水珠 + 波浪。
+	MotifWave
+	// MotifWind 风：回旋气流。
+	MotifWind
 )
 
 // Art 是主题卡片右侧的装饰线稿：每个角色一幅，形状与人物气质呼应。
@@ -202,25 +208,25 @@ var all = []Character{
 		CardBg: ui.Hex("#37203F"), Art: ArtSakura,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
 	},
-	// 以下角色有自己的壁纸，但标识先复用冰晶画法，等补了专属 Motif 再换。
+	// 以下角色有自己的壁纸与专属 Motif（草叶 / 水滴 / 风纹）。
 	{
 		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Epithet: "新芽",
 		Motto: "白草净华", Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
-		Element: Dendro, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.66,
+		Element: Dendro, Motif: MotifLeaf, WallTint: 0.15, Scrim: 0.66,
 		CardBg: ui.Hex("#1F3A22"), Art: ArtLeaf,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
 	},
 	{
 		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
 		Motto: "不休独舞", Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
-		Element: Hydro, Motif: MotifCrystal, WallTint: 0.14, Scrim: 0.35,
+		Element: Hydro, Motif: MotifWave, WallTint: 0.14, Scrim: 0.35,
 		CardBg: ui.Hex("#15294A"), Art: ArtSail,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
 	},
 	{
 		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
 		Motto: "百巧千机", Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
-		Element: Anemo, Motif: MotifCrystal, WallTint: 0.16, Scrim: 0.47,
+		Element: Anemo, Motif: MotifWind, WallTint: 0.16, Scrim: 0.47,
 		CardBg: ui.Hex("#17342F"), Art: ArtCrystal,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
 	},

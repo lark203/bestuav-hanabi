@@ -175,37 +175,71 @@ func drawCrystalMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade f
 	glow(p, x, y, rad*2.6, accent, al*(0.42+0.55*impact))
 
 	ice := accent.Mix(ui.Hex("#FFFFFF"), 0.72).Alpha(al * 0.95)
-	wBase := max32(2.2, rad*0.16)
+	iceDim := accent.Mix(ui.Hex("#FFFFFF"), 0.52).Alpha(al * 0.62)
+	armW := max32(1.8, rad*0.055)
 
 	// 整体随成形过程旋转 5τ/6（与原项目同一个转角）。
-	// 六角星有 60° 旋转对称：300° mod 60° = 0°，末态与品牌位的静态 glyph 角度一致。
 	rot := float64(5*math.Pi/3) * float64(turn)
 
-	// 六片刃状主臂：每条臂错开生长（0.35s 起、每条晚 0.16s），开场才有「抽枝」
-	// 的过程。画法与静态 glyph 共用 crystalArm，落进品牌位时形状完全一致。
 	for i := 0; i < 6; i++ {
-		ang := float32(rot + float64(i)*math.Pi/3)
-		grow := intro.Smooth(in.T, 0.35+float32(i)*0.16, 0.95+float32(i)*0.16)
-		crystalArm(p, x, y, ang, rad, grow, wBase, ice)
-	}
+		ang := rot + float64(i)*math.Pi/3
+		ca, sa := float32(math.Cos(ang)), float32(math.Sin(ang))
 
-	// 臂间短刺：随成形第二波长出（比主臂晚一拍，层次感）。
-	spike := intro.Smooth(in.T, 1.05, 1.75)
-	if spike > 0 {
-		for i := 0; i < 6; i++ {
-			ang := rot + (float64(i)+0.5)*math.Pi/3
-			ca, sa := float32(math.Cos(ang)), float32(math.Sin(ang))
-			seg(p,
-				x+rad*0.24*ca, y+rad*0.24*sa,
-				x+rad*(0.24+0.26*spike)*ca, y+rad*(0.24+0.26*spike)*sa,
-				wBase*0.45, ice)
+		// 每条臂错开生长（0.35s 起、每条晚 0.16s），开场才有「抽枝」的过程，
+		// 而不是一上来就是一整朵雪花。原项目用 IceArm 的 growth 参数做同样的事。
+		grow := intro.Smooth(in.T, 0.35+float32(i)*0.16, 0.95+float32(i)*0.16)
+		rl := rad * grow
+		if rl < 1 {
+			continue
+		}
+
+		// 主干：比侧枝明显粗，六臂的骨架才立得住。
+		seg(p, x, y, x+rl*ca, y+rl*sa, armW, ice)
+
+		// 三对侧枝：与主干成 60°，越靠外越短——冰晶的经典分叉。
+		// 起点从 0.40 开始（太靠内会和中心核挤在一起，读起来像碎片）。
+		for j := 1; j <= 3; j++ {
+			f := 0.20 + 0.21*float64(j) // 0.41 / 0.62 / 0.83
+			bx := x + rl*float32(f)*ca
+			by := y + rl*float32(f)*sa
+			bl := rl * float32(0.26-0.045*float64(j))
+			for _, sgn := range []float64{-1, 1} {
+				ba := ang + sgn*(math.Pi/3)
+				seg(p, bx, by,
+					bx+bl*float32(math.Cos(ba)), by+bl*float32(math.Sin(ba)),
+					armW*0.72, iceDim)
+			}
+		}
+
+		// 臂尖：一个小菱形收口（沿半径方向拉长，像水晶的尖端）。
+		tx, ty := x+rl*ca, y+rl*sa
+		ux, uy := ca, sa  // 径向
+		vx, vy := -sa, ca // 切向
+		tr := rl * 0.075
+		ax, ay := tx+ux*tr, ty+uy*tr
+		bx2, by2 := tx+vx*tr*0.5, ty+vy*tr*0.5
+		cx2, cy2 := tx-ux*tr*0.30, ty-uy*tr*0.30
+		dx2, dy2 := tx-vx*tr*0.5, ty-vy*tr*0.5
+		for _, edge := range [][4]float32{
+			{ax, ay, bx2, by2}, {bx2, by2, cx2, cy2},
+			{cx2, cy2, dx2, dy2}, {dx2, dy2, ax, ay},
+		} {
+			seg(p, edge[0], edge[1], edge[2], edge[3], armW*0.7, ice)
 		}
 	}
 
-	// 中心六角核：压住六臂汇聚点，随成形亮起。
-	crystalCore(p, x, y, float32(rot), rad, wBase*0.7, ice)
+	// 中心核：小六边形压住六臂汇聚点。
+	hexR := rad * 0.16
+	for i := 0; i < 6; i++ {
+		a0 := rot + float64(i)*math.Pi/3
+		a1 := rot + float64(i+1)*math.Pi/3
+		seg(p,
+			x+hexR*float32(math.Cos(a0)), y+hexR*float32(math.Sin(a0)),
+			x+hexR*float32(math.Cos(a1)), y+hexR*float32(math.Sin(a1)),
+			armW*0.9, ice,
+		)
+	}
 	// 中心的一点亮，别太强——光晕已经在小范围里叠了两层（外光晕 + 这里）。
-	hexR := rad * 0.18
 	glow(p, x, y, hexR*2.0, accent.Mix(ui.Hex("#FFFFFF"), 0.85), al*0.45)
 }
 
