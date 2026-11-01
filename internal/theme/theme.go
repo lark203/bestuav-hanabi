@@ -75,29 +75,6 @@ const (
 	MotifGeo
 )
 
-// Art 是主题卡片右侧的装饰线稿：每个角色一幅，形状与人物气质呼应。
-//
-// 卡片不铺壁纸缩略图（缩略图缩小后只是一团色块），改为纯色底 + 线稿：
-// 纯色保证一排卡片色彩分明，线稿让每张卡片有各自的图形记忆点。
-type Art uint8
-
-const (
-	// ArtBlossom 霜花 + 风铃。
-	ArtBlossom Art = iota
-	// ArtSakura 樱枝 + 御守。
-	ArtSakura
-	// ArtFirework 烟花 + 灯笼。
-	ArtFirework
-	// ArtLeaf 叶枝 + 新芽。
-	ArtLeaf
-	// ArtSail 帆船 + 水波。
-	ArtSail
-	// ArtCrystal 棱晶 + 书页。
-	ArtCrystal
-	// ArtRing 岩环 + 六方。
-	ArtRing
-)
-
 // Tokens 是一套角色主题的调色板。
 type Tokens struct {
 	WinFill    ui.Color // 窗口内容底色
@@ -135,8 +112,6 @@ type Character struct {
 
 	// CardBg 是主题卡片的纯色底。每张卡片一块纯色，选中时加元素色描边。
 	CardBg ui.Color
-	// Art 是卡片右侧的装饰线稿。
-	Art Art
 
 	// Bg 是壁纸在 assets/ 下的相对路径（每个角色一张，均从原项目导入）。
 	Bg string
@@ -185,44 +160,44 @@ var all = []Character{
 		ID: "ganyu", NameCN: "甘雨", NameEN: "Ganyu", Epithet: "循霜",
 		Motto: "瑞霜而行", Scene: "璃月 · 海灯夜", SceneEN: "A QUIET MOMENT",
 		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
-		CardBg: ui.Hex("#14314A"), Art: ArtBlossom,
-		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
+		CardBg: ui.Hex("#14314A"),
+		Bg:     "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
 		Motto: "琉焰华舞", Scene: "稻妻 · 夏祭", SceneEN: "FIREFWORKS AT DUSK",
 		Element: Pyro, Motif: MotifFlame, WallTint: 0.18, Scrim: 0.47,
-		CardBg: ui.Hex("#3E2418"), Art: ArtFirework,
-		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
+		CardBg: ui.Hex("#3E2418"),
+		Bg:     "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
 	},
 	{
 		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko", Epithet: "神樱",
 		Motto: "浮世笑百姿", Scene: "鸣神 · 神樱", SceneEN: "SACRED SAKURA",
 		Element: Electro, Motif: MotifBolt, WallTint: 0.15, Scrim: 0.66,
-		CardBg: ui.Hex("#37203F"), Art: ArtSakura,
-		Bg: "yae/bg.jpg", Tok: yaeTokens(),
+		CardBg: ui.Hex("#37203F"),
+		Bg:     "yae/bg.jpg", Tok: yaeTokens(),
 	},
 	// 以下角色有自己的壁纸，但标识先复用冰晶画法，等补了专属 Motif 再换。
 	{
 		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Epithet: "新芽",
 		Motto: "白草净华", Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
 		Element: Dendro, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.66,
-		CardBg: ui.Hex("#1F3A22"), Art: ArtLeaf,
-		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
+		CardBg: ui.Hex("#1F3A22"),
+		Bg:     "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
 	},
 	{
 		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
 		Motto: "不休独舞", Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
 		Element: Hydro, Motif: MotifCrystal, WallTint: 0.14, Scrim: 0.35,
-		CardBg: ui.Hex("#15294A"), Art: ArtSail,
-		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
+		CardBg: ui.Hex("#15294A"),
+		Bg:     "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
 	},
 	{
 		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
 		Motto: "百巧千机", Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
 		Element: Anemo, Motif: MotifCrystal, WallTint: 0.16, Scrim: 0.47,
-		CardBg: ui.Hex("#17342F"), Art: ArtCrystal,
-		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
+		CardBg: ui.Hex("#17342F"),
+		Bg:     "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
 	},
 	{
 		// 钟离的壁纸原项目只有 .hbw 打包格式，这里是从中提取图层合成出的静态图
@@ -230,8 +205,8 @@ var all = []Character{
 		ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Epithet: "岩契",
 		Motto: "尘世闲游", Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
 		Element: Geo, Motif: MotifGeo, WallTint: 0.18, Scrim: 0.62,
-		CardBg: ui.Hex("#392C14"), Art: ArtRing,
-		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),
+		CardBg: ui.Hex("#392C14"),
+		Bg:     "zhongli/bg.jpg", Tok: zhongliTokens(),
 	},
 }
 

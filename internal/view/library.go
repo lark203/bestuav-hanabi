@@ -172,10 +172,12 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 		// 是「卡片是实体」这个质感的重要来源。
 		p.Fill(ui.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: 1},
 			ui.RGBA(255, 255, 255, 0.16), 0)
-		// 线稿画在右半区，越出卡片的部分由圆角裁掉。
+		// 右侧大图案：与菜单选中项右侧、侧栏底部是同一个 glyph——
+		// 全界面的图案都出自一套元素标识，只是尺寸与深浅不同。
 		p.Clip(r, a.tok.Radius, func() {
-			cardArt(p, ch.Art, ui.Rect{X: r.X + r.W*0.38, Y: r.Y, W: r.W * 0.66, H: r.H},
-				ch.Tok.Accent)
+			cx, cy := r.X+r.W*0.58, r.Y+r.H*0.44
+			glow(p, cx, cy, r.H*0.52, ch.Tok.Accent, 0.30)
+			glyph(p, ch.Motif, cx, cy, r.H*0.36, ui.Hex("#FFFFFF"), 0.34, 1)
 		})
 	})
 

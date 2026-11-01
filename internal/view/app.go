@@ -162,8 +162,15 @@ func (a *App) sidebar(c *ui.Context) {
 	col := ui.Column(c).Width(212).Background(a.tok.Sidebar)
 	col.Children(func() {
 		// 品牌区不贴顶：参考图里图标顶部约占窗口高 8.5%，按 800 高折算约 64px。
+		// 品牌图标：启动动画期间留空——开场标识正飞向这个位置，
+		// 落定（introDone）后由 elementMark 接手显示，完成「飞入品牌位」的交接。
+		// 不播开场（introDone 或尚未创建 intro）时直接显示。
 		ui.Row(c).Padding(64, 12, 10, 20).Gap(12).AlignItems(ui.Center).Children(func() {
-			a.elementMark(c, 40)
+			if a.intro == nil || a.introDone {
+				a.elementMark(c, 40)
+			} else {
+				ui.Row(c).Width(40).Height(40)
+			}
 			ui.Column(c).Gap(1).Children(func() {
 				ui.Text(c, "HanaBi").FontSize(19).Bold().TextColor(a.tok.Text)
 				ui.Text(c, a.char.Motto).FontSize(9).TextColor(a.tok.TextFaint)
