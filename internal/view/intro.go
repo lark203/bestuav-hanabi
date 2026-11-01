@@ -19,10 +19,11 @@ import (
 // 灯笼原本是「6×14×5 网格 + 旋转投影」的伪 3D（每盏约 840 个三角形），
 // 这里改成 2D 表示：1080p 下这些灯只有 3~32px，3D 细节本来就看不出来。
 
-// introDockX/introDockY 是标识停靠点：侧栏品牌头像的中心（padding 18,16 + 头像 38/2）。
+// introDockX/introDockY 是标识停靠点：侧栏品牌图标的中心
+// （侧栏 padding 左 20 / 上 16，图标 40×40）——开场结束后品牌图标接着显示同一个 glyph。
 const (
-	introDockX = 37
-	introDockY = 35
+	introDockX = 40
+	introDockY = 36
 )
 
 const tau = 2 * math.Pi
@@ -137,6 +138,8 @@ func (a *App) drawMark(p *ui.Painter, pose intro.MarkPose, fade float32) {
 		drawFlameMark(p, a.intro, pose, fade, a.tok.Accent)
 	case theme.MotifBolt:
 		drawBoltMark(p, a.intro, pose, fade, a.tok.Accent)
+	case theme.MotifGeo:
+		drawGeoMark(p, a.intro, pose, fade, a.tok.Accent)
 	default:
 		drawCrystalMark(p, a.intro, pose, fade, a.tok.Accent)
 	}
@@ -312,6 +315,53 @@ func drawBoltMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade floa
 		glow(p, px, py, rad*0.10, hot, al*0.8)
 	}
 	glow(p, x, y, rad*0.30, ui.Hex("#F0E4FF"), al*0.9)
+}
+
+// drawGeoMark 画岩元素标识：六边形岩印 + 内嵌菱形。
+//
+// 岩的符号感来自"规整、厚重"：外轮廓是正六边形，中间一枚缓慢转正的菱形，
+// 不像冰晶那样有大量分叉，靠线宽和实心度撑重量。
+func drawGeoMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+	al := pose.Opacity * fade
+	if al <= 0.004 || pose.Radius <= 0.5 {
+		return
+	}
+	x, y, rad := pose.X, pose.Y, pose.Radius
+
+	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
+	solid := intro.Smooth(in.T, 3.20, 3.90)
+
+	glow(p, x, y, rad*2.4, accent, al*(0.38+0.45*solid))
+
+	gold := accent.Mix(ui.Hex("#FFFFFF"), 0.55).Alpha(al * 0.92)
+	armW := max32(1.6, rad*0.05)
+
+	// 正六边形：顶点朝上，六个顶点连线。
+	hexR := rad * (0.72 + 0.28*solid)
+	for i := 0; i < 6; i++ {
+		a0 := -math.Pi/2 + float64(i)*math.Pi/3
+		a1 := -math.Pi/2 + float64(i+1)*math.Pi/3
+		seg(p,
+			x+hexR*float32(math.Cos(a0)), y+hexR*float32(math.Sin(a0)),
+			x+hexR*float32(math.Cos(a1)), y+hexR*float32(math.Sin(a1)),
+			armW, gold)
+	}
+
+	// 内嵌菱形：随成形进度转正 45°。
+	dm := rad * (0.26 + 0.26*solid)
+	r45 := float64(turn) * math.Pi / 4
+	for i := 0; i < 4; i++ {
+		a0 := r45 + float64(i)*math.Pi/2
+		a1 := r45 + float64(i+1)*math.Pi/2
+		seg(p,
+			x+dm*float32(math.Cos(a0)), y+dm*float32(math.Sin(a0)),
+			x+dm*float32(math.Cos(a1)), y+dm*float32(math.Sin(a1)),
+			armW*0.85, gold)
+	}
+
+	// 中心亮核。
+	glow(p, x, y, rad*0.30, ui.Hex("#FFF3C4"), al*0.85)
+	circle(p, x, y, rad*0.07, ui.Hex("#FFFCF0").Alpha(al*0.9))
 }
 
 // drawIntroBrand 右下角的 "HANABI" 字标：逐字绘制以做出字距。

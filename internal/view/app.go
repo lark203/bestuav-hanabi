@@ -2,6 +2,7 @@
 package view
 
 import (
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -38,6 +39,9 @@ type App struct {
 	t0       time.Time
 	animPlay float32
 
+	// filter 是主题库的元素筛选：-1 表示「全部」，否则是 theme.Element 的数值。
+	filter int
+
 	// 开场动画：在主界面之上叠一层，播完自行淡出并让视图重建一次。
 	intro     *intro.Intro
 	introAt   time.Time
@@ -51,7 +55,7 @@ const animFPS = 12
 // NewApp 创建应用，默认停在主题库页。
 func NewApp() *App {
 	c := theme.Default()
-	return &App{char: c, tok: c.Tok, page: "library", t0: time.Now(), animPlay: 1}
+	return &App{char: c, tok: c.Tok, page: "library", t0: time.Now(), animPlay: 1, filter: -1}
 }
 
 // setCharacter 切换角色主题：令牌与标识画法一起换，界面下一帧即生效。
@@ -129,91 +133,132 @@ func (a *App) View(c *ui.Context) {
 	}
 }
 
-// avatar 画当前角色的头像：有素材用图片，没有就用元素色圆 + 首字占位。
+// elementMark 画当前角色的元素标识：品牌图标与侧栏底部共用。
 //
-// 原项目只给了甘雨的角色头像，其余五个角色没有——占位样式让主题切换时
-// 仍能一眼看出换了谁，而不是六个角色共用同一张脸。
-func (a *App) avatar(c *ui.Context, size float32) {
-	if a.char.Icon != "" {
-		if bmp := assets.Bitmap(a.char.Icon); bmp != nil {
-			ui.Image(c, bmp).Width(size).Height(size).Radius(size / 2).Clip()
-			return
-		}
-	}
-	initial := "?"
-	if r := []rune(a.char.NameCN); len(r) > 0 {
-		initial = string(r[0])
-	}
-	// 实心元素色圆 + 深色字。
-	// 早先用的是 AccentSoft（14% 透明度）配 accent 文字：两个都是浅色系，
-	// 压在浅色壁纸上（纳西妲、八重神子的壁纸就是浅色立绘）等于隐形。
-	ui.Row(c).Width(size).Height(size).Radius(size / 2).
-		Background(a.tok.Accent).AlignItems(ui.Center).Justify(ui.Center).
-		Children(func() {
-			ui.Text(c, initial).FontSize(size * 0.46).Bold().TextColor(ui.Hex("#0A1420"))
-		})
+// 开场的标识正是停靠到这个位置（introDockX/Y），两边用的是同一套 glyph，
+// 所以开场结束时接手不会跳变——这就是"启动页的图标动画移过来"。
+func (a *App) elementMark(c *ui.Context, size float32) {
+	ui.Row(c).Width(size).Height(size).Draw(func(p *ui.Painter, r ui.Rect) {
+		cx, cy := r.X+r.W/2, r.Y+r.H/2
+		glow(p, cx, cy, size*0.58, a.tok.Accent, 0.55)
+		glyph(p, a.char.Motif, cx, cy, size*0.36, a.tok.Accent, 1, 0)
+	})
 }
 
-// sidebar 左侧栏：品牌（头像 + 双行标题）+ 菜单。
-//
-// 侧栏用 glass.Clear：大面积面板用 Regular 会把壁纸糊得太狠，
-// Clear 只轻微磨砂，壁纸的色块和笔触还能辨认（参考图就是这层质感）。
+// sidebar 左侧栏：品牌（元素标识 + 名称）→ 分组标签 → 菜单 → 底部当前角色。
 func (a *App) sidebar(c *ui.Context) {
-	ui.Column(c).Width(212).
-		Material(glass.Glass{Style: glass.Clear, Clarity: 0.30}).
-		Children(func() {
-			ui.Row(c).Padding(18, 16, 16, 18).Gap(11).AlignItems(ui.Center).Children(func() {
-				a.avatar(c, 38)
-				ui.Column(c).Gap(1).Children(func() {
-					ui.Text(c, "花火").FontSize(17).Bold().TextColor(a.tok.Text)
-					ui.Text(c, "HANABI UI").FontSize(9).TextColor(a.tok.TextFaint)
-				})
-			})
-
-			ui.Column(c).PaddingX(10).Gap(2).Children(func() {
-				for _, it := range nav {
-					a.navRow(c, it.id, it.label, it.icon)
-				}
+	col := ui.Column(c).Width(212)
+	// Regular 在暗模式下会压暗底下的壁纸；Clear 太透，亮壁纸（钟离、纳西妲）
+	// 上菜单文字会糊。Clarity 0.15 保留一点通透，但足够托住文字。
+	col.Material(glass.Glass{Style: glass.Regular, Clarity: 0.15})
+	col.Children(func() {
+		ui.Row(c).Padding(16, 12, 10, 20).Gap(12).AlignItems(ui.Center).Children(func() {
+			a.elementMark(c, 40)
+			ui.Column(c).Gap(1).Children(func() {
+				ui.Text(c, "HanaBi").FontSize(19).Bold().TextColor(a.tok.Text)
+				ui.Text(c, "HANABI UI").FontSize(8.5).TextColor(a.tok.TextFaint)
 			})
 		})
+
+		// 分组标签：原版把导航分成「工作空间」等几组。
+		ui.Text(c, "工作空间").FontSize(9).TextColor(a.tok.TextFaint).
+			Padding(13, 10, 6, 20)
+
+		ui.Column(c).PaddingX(12).Gap(2).Children(func() {
+			for _, it := range nav {
+				a.navRow(c, it.id, it.label, it.icon)
+			}
+		})
+
+		ui.Spacer(c)
+
+		// 底部：当前角色的大标识 + 名字，与顶部形成呼应。
+		ui.Column(c).Padding(16, 12, 18, 20).Gap(9).Children(func() {
+			a.elementMark(c, 52)
+			ui.Column(c).Gap(1).Children(func() {
+				ui.Text(c, a.char.NameCN+" · "+a.char.Element.Label()).
+					FontSize(11).TextColor(a.tok.TextMuted)
+				ui.Text(c, strings.ToUpper(a.char.NameEN)).
+					FontSize(8).TextColor(a.tok.TextFaint)
+			})
+		})
+	})
 }
 
-// navRow 菜单项：左侧竖条 + 图标 + 文字；选中时整体用元素色。
+// navRow 菜单项：图标 + 文字，选中时底色胶囊 + 右侧标出当前主题的元素符号。
 func (a *App) navRow(c *ui.Context, id, label string, icon *ui.SVG) {
 	active := a.page == id
 
-	row := ui.Row(c).Height(38).Padding(0, 12, 0, 0).Gap(10).Radius(9).AlignItems(ui.Center)
-	bar := ui.Transparent
+	row := ui.Row(c).Height(40).Padding(9, 12, 9, 12).Gap(11).
+		Radius(9).AlignItems(ui.Center)
 	color := a.tok.TextMuted
 	if active {
 		row.Background(a.tok.AccentSoft)
-		bar = a.tok.Accent
-		color = a.tok.Accent
+		color = a.tok.Text
 	}
 	if row.Clicked() {
 		a.page = id
 	}
 	row.Children(func() {
-		ui.Row(c).Width(3).Height(16).Radius(2).Background(bar)
 		ui.Icon(c, icon).FontSize(17).TextColor(color)
-		ui.Text(c, label).FontSize(14).TextColor(color)
+		ui.Text(c, label).FontSize(13).TextColor(color).Grow(1)
+		if active {
+			ui.Row(c).Width(15).Height(15).Draw(func(p *ui.Painter, r ui.Rect) {
+				glyph(p, a.char.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.44, a.tok.Accent, 0.85, 0)
+			})
+		}
 	})
 }
 
-// titlebar 自绘标题栏：参考图里只保留右上角窗口按钮（骨架阶段为视觉占位）。
-// 同样铺玻璃，让顶部与左侧栏的材质连续。
+// titlebar 自绘标题栏：整条可拖动窗口，右侧是最小化 / 最大化 / 关闭。
+//
+// 系统标题栏与窗口按钮已由 main.go 关掉（TitleBarHidden + HideWindowButtons），
+// 否则会和我们这一条叠成两层。双击标题栏最大化由 DragWindow 自带。
 func (a *App) titlebar(c *ui.Context) {
-	ui.Row(c).Height(44).Padding(16, 12).AlignItems(ui.Center).Gap(6).
-		Material(glass.Glass{Style: glass.Clear, Clarity: 0.15}).
-		Children(func() {
-			ui.Spacer(c)
-			for _, s := range []string{"—", "□", "✕"} {
-				ui.Row(c).Width(28).Height(28).Radius(7).AlignItems(ui.Center).Justify(ui.Center).
-					Children(func() {
-						ui.Text(c, s).FontSize(12).TextColor(a.tok.TextMuted)
-					})
+	bar := ui.Row(c).Height(40).Padding(10, 8).AlignItems(ui.Center).Gap(4)
+	bar.Children(func() {
+		ui.Spacer(c)
+		a.winButton(c, icons.Minimize, "最小化", func() {
+			if a.win != nil {
+				a.win.Minimize()
 			}
 		})
+		a.winButton(c, icons.Maximize, "最大化 / 还原", func() {
+			if a.win == nil {
+				return
+			}
+			if a.win.IsMaximized() {
+				a.win.Unmaximize()
+			} else {
+				a.win.Maximize()
+			}
+		})
+		a.winButton(c, icons.Close, "关闭", func() {
+			if a.win != nil {
+				a.win.Close()
+			}
+		})
+	})
+	bar.DragWindow()
+}
+
+// winButton 是一个窗口控件按钮：悬停变亮，点击执行 action。
+//
+// 图标用 SVG 而不是 "—" "□" "✕" 这些字符：字体里不一定有这些字形，
+// 缺字形时按钮会变成一个空方块（试过）。
+func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func()) {
+	btn := ui.Row(c).Width(32).Height(26).Radius(6).
+		AlignItems(ui.Center).Justify(ui.Center)
+	if btn.Hovered() {
+		btn.Background(ui.RGBA(255, 255, 255, 0.16))
+	}
+	btn.Tooltip(tip)
+	if btn.Clicked() {
+		action()
+	}
+	btn.Children(func() {
+		ui.Icon(c, icon).FontSize(16).TextColor(a.tok.Text)
+	})
 }
 
 // content 内容区：按当前页分发。
@@ -230,19 +275,13 @@ func (a *App) content(c *ui.Context) {
 	})
 }
 
-// statusbar 整宽底部：左角色标记、中品牌小字、右工作空间状态。
+// statusbar 整宽底部：中间一行品牌小字，右侧是工作空间状态。
 //
-// 状态栏也用玻璃：它是整宽的一条，若只是裸壁纸，会和上方的玻璃侧栏之间
-// 出现一条质地不同的接缝。玻璃条把上下两块的材质统一起来。
+// 角色信息已经挪到侧栏底部（原版就是这样），这里只留一条低调的横条。
 func (a *App) statusbar(c *ui.Context) {
-	ui.Row(c).Height(54).Padding(18, 16).AlignItems(ui.Center).Gap(9).
+	ui.Row(c).Height(44).Padding(18, 16).AlignItems(ui.Center).
 		Material(glass.Glass{Style: glass.Clear, Clarity: 0.15}).
 		Children(func() {
-			a.avatar(c, 22)
-			ui.Column(c).Gap(1).Children(func() {
-				ui.Text(c, a.char.NameCN+" · "+a.char.Element.Label()).FontSize(11).TextColor(a.tok.TextMuted)
-				ui.Text(c, "A GENTLE FIGURE").FontSize(8).TextColor(a.tok.TextFaint)
-			})
 			ui.Spacer(c)
 			ui.Text(c, "HANABI / PERSONAL WORKSPACE").FontSize(9).TextColor(a.tok.TextFaint)
 			ui.Spacer(c)

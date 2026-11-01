@@ -40,6 +40,27 @@ func (e Element) Label() string {
 	return "未知"
 }
 
+// Short 返回元素的单字名（筛选条上用的「冰 / 水 / 雷 …」）。
+func (e Element) Short() string {
+	switch e {
+	case Cryo:
+		return "冰"
+	case Pyro:
+		return "火"
+	case Electro:
+		return "雷"
+	case Dendro:
+		return "草"
+	case Hydro:
+		return "水"
+	case Anemo:
+		return "风"
+	case Geo:
+		return "岩"
+	}
+	return "?"
+}
+
 // Motif 是元素标识的画法。绘制层按它分支，而不是按角色名。
 type Motif uint8
 
@@ -50,6 +71,8 @@ const (
 	MotifFlame
 	// MotifBolt 雷：折线闪电 + 外侧小分叉。
 	MotifBolt
+	// MotifGeo 岩：六边形岩印 + 内嵌菱形。
+	MotifGeo
 )
 
 // Tokens 是一套角色主题的调色板。
@@ -73,9 +96,11 @@ type Tokens struct {
 
 // Character 是一个角色主题包。
 type Character struct {
-	ID      string
-	NameCN  string
-	NameEN  string
+	ID     string
+	NameCN string
+	NameEN string
+	// Epithet 是卡片上的属性词，如「甘雨·循霜」里的「循霜」。
+	Epithet string
 	Element Element
 	Motif   Motif
 	Tok     Tokens
@@ -124,35 +149,42 @@ func derive(accent ui.Color) Tokens {
 // 目录约定为 assets/<id>/bg.jpg 与可选的 assets/<id>/icon.png。
 var all = []Character{
 	{
-		ID: "ganyu", NameCN: "甘雨", NameEN: "Ganyu",
+		ID: "ganyu", NameCN: "甘雨", NameEN: "Ganyu", Epithet: "循霜",
 		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
 	},
 	{
-		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya",
+		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
 		Element: Pyro, Motif: MotifFlame, WallTint: 0.18, Scrim: 0.47,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
 	},
 	{
-		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko",
+		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko", Epithet: "神樱",
 		Element: Electro, Motif: MotifBolt, WallTint: 0.15, Scrim: 0.66,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
 	},
 	// 以下角色有自己的壁纸，但标识先复用冰晶画法，等补了专属 Motif 再换。
 	{
-		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida",
+		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Epithet: "新芽",
 		Element: Dendro, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.66,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
 	},
 	{
-		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina",
+		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
 		Element: Hydro, Motif: MotifCrystal, WallTint: 0.14, Scrim: 0.35,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
 	},
 	{
-		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan",
+		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
 		Element: Anemo, Motif: MotifCrystal, WallTint: 0.16, Scrim: 0.47,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
+	},
+	{
+		// 钟离的壁纸原项目只有 .hbw 打包格式，这里是从中提取图层合成出的静态图
+		// （金色渐变 + 岩印 + 立绘 + 沙漠）。色彩本身很亮，压暗给到 0.46。
+		ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Epithet: "岩契",
+		Element: Geo, Motif: MotifGeo, WallTint: 0.18, Scrim: 0.62,
+		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),
 	},
 }
 
@@ -210,6 +242,19 @@ func yaeTokens() Tokens {
 	t.Text = ui.Hex("#F0E9FF")
 	t.TextMuted = ui.Hex("#B6A8D4")
 	t.TextFaint = ui.Hex("#A99BC4")
+	return t
+}
+
+// zhongliTokens 钟离（岩）：金褐，文字偏暖白。
+func zhongliTokens() Tokens {
+	t := derive(ui.Hex("#E8C87A"))
+	t.WinFill = ui.RGBA(24, 18, 10, 0.56)
+	t.Sidebar = ui.RGBA(28, 21, 12, 0.44)
+	t.Card = ui.RGBA(232, 200, 122, 0.11)
+	t.CardStroke = ui.RGBA(255, 226, 150, 0.22)
+	t.Text = ui.Hex("#FFF6E2")
+	t.TextMuted = ui.Hex("#E4D2AE")
+	t.TextFaint = ui.Hex("#BFA982")
 	return t
 }
 
