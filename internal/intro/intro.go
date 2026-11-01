@@ -153,6 +153,11 @@ func (in *Intro) Opacity() float32 { return 1 - Smooth(in.T, DockStart, 5.55) }
 // HandoffK 是「交给主界面」的进度：标识从中央飞到侧栏并缩到图标大小。
 func (in *Intro) HandoffK() float32 { return Smooth(in.T, DockStart, Duration) }
 
+// dockR 是停靠终点的标识半径，必须等于品牌图标 glyph 的半径
+// （品牌图标 40 DIP × glyph 系数 0.36 = 14.4）——缩到这个大小正好落进
+// 品牌位，交接瞬间没有尺寸跳变。改品牌图标尺寸时同步这里。
+const dockR = float32(14.4)
+
 // Progress 是整体进度 0..1。
 func (in *Intro) Progress() float32 { return clamp01(in.T / Duration) }
 
@@ -181,7 +186,7 @@ func (in *Intro) Pose(dockX, dockY float32) MarkPose {
 	return MarkPose{
 		X:       x,
 		Y:       y,
-		Radius:  lerp(min32(in.W, in.H)*0.155*impact, 16, dock),
+		Radius:  lerp(min32(in.W, in.H)*0.155*impact, dockR, dock),
 		Opacity: Smooth(t, 0.18, 0.67),
 	}
 }

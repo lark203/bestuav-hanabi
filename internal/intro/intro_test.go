@@ -57,8 +57,8 @@ func TestPose(t *testing.T) {
 	if math.Abs(float64(end.X-dockX)) > 0.5 || math.Abs(float64(end.Y-dockY)) > 0.5 {
 		t.Errorf("结束应停在 (%.0f,%.0f)，实际 (%.1f,%.1f)", dockX, dockY, end.X, end.Y)
 	}
-	if math.Abs(float64(end.Radius-16)) > 0.5 {
-		t.Errorf("结束半径应为 16，实际 %.1f", end.Radius)
+	if math.Abs(float64(end.Radius-dockR)) > 0.5 {
+		t.Errorf("结束半径应为 %.1f（品牌 glyph 大小），实际 %.1f", dockR, end.Radius)
 	}
 }
 

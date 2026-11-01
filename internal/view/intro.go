@@ -20,10 +20,12 @@ import (
 // 这里改成 2D 表示：1080p 下这些灯只有 3~32px，3D 细节本来就看不出来。
 
 // introDockX/introDockY 是标识停靠点：侧栏品牌图标的中心
-// （侧栏 padding 左 20 / 上 16，图标 40×40）——开场结束后品牌图标接着显示同一个 glyph。
+// （侧栏 padding 左 20 / 上 64，图标 40×40）——开场结束后品牌图标接着显示同一个 glyph。
+// ⚠️ 改品牌区的位置/尺寸时必须同步这里，否则标识会落在品牌位上方的空处
+// （曾因这组常量停留在旧值 (40,36)，标识落点比品牌位高 48px）。
 const (
 	introDockX = 40
-	introDockY = 36
+	introDockY = 84
 )
 
 const tau = 2 * math.Pi
