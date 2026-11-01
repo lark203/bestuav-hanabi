@@ -8,7 +8,15 @@ import (
 	"bestuav-hanabi/internal/theme"
 )
 
-// libraryPage 主题库：标题区 + 元素筛选 + 三列角色卡片。
+// 卡片网格的布局常量：sidebarW/pagePadX 用于把窗口宽度换算成卡片区可用宽度。
+const (
+	sidebarW = 212
+	pagePadX = 22
+	cardMinW = 280
+	cardGap  = 14
+)
+
+// libraryPage 主题库：标题区 + 元素筛选 + 卡片网格（列数随窗口宽度自适应）。
 //
 // 页面里没有任何角色名或颜色常量——全部来自 theme.All()。
 func (a *App) libraryPage(c *ui.Context) {
@@ -24,13 +32,28 @@ func (a *App) libraryPage(c *ui.Context) {
 		}
 	}
 
+	// 列数随窗口宽度自适应（flex-wrap 的效果）：卡片在行内撑满剩余宽度，
+	// 窗口变宽列数变多、变窄列数变少，始终没有右侧的空档。
+	// 2~4 列：以卡片最小舒适宽度约 280 DIP 划档。
+	w, _ := c.Size()
+	avail := w - sidebarW - 1 - pagePadX*2
+	cols := int((avail + cardGap) / (cardMinW + cardGap))
+	if cols < 2 {
+		cols = 2
+	}
+	if cols > 4 {
+		cols = 4
+	}
+	// 卡片用显式宽度而不是 Grow(1)：整行正好填满，最后一行不满时
+	// 卡片保持同宽（Grow 会把末行那几张拉通栏）。
+	cardW := (avail - cardGap*float32(cols-1)) / float32(cols)
+
 	ui.Scroll(c).Grow(1).Children(func() {
-		ui.Column(c).Padding(4, 0, 10, 0).Gap(14).Children(func() {
-			const cols = 3
+		ui.Column(c).Padding(4, 0, 10, 0).Gap(cardGap).Children(func() {
 			for i := 0; i < len(shown); i += cols {
-				ui.Row(c).Gap(14).AlignItems(ui.Start).Children(func() {
+				ui.Row(c).Gap(cardGap).AlignItems(ui.Start).Children(func() {
 					for j := i; j < i+cols && j < len(shown); j++ {
-						a.characterCard(c, shown[j])
+						a.characterCard(c, shown[j], cardW)
 					}
 				})
 			}
@@ -126,11 +149,10 @@ func (a *App) filterChip(c *ui.Context, label string, on bool, onClick func()) {
 //
 // 为什么不用壁纸缩略图：一张 4K 插画缩到 246×142 只剩一团色块，
 // 七张并排时彼此难分；纯色 + 线稿既保证一排卡片色彩分明，也让每张有图形记忆点。
-func (a *App) characterCard(c *ui.Context, ch theme.Character) {
+func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 	active := ch.ID == a.char.ID
 
-	// Grow 占满一行；MaxWidth 兜住「最后一行只有一张卡片被拉通栏」的情况。
-	card := ui.Column(c).Grow(1).MaxWidth(330).Height(142).Padding(15, 14).
+	card := ui.Column(c).Width(cardW).Height(142).Padding(15, 14).
 		Radius(a.tok.Radius).Border(1, ui.RGBA(255, 255, 255, 0.10)).
 		Background(ch.CardBg)
 
