@@ -149,6 +149,33 @@ type Tokens struct {
 	Radius float32 // 全局圆角
 }
 
+// Mix 在两组令牌之间插值（主题切换的 0.42 秒交叉淡入用）。
+// k=0 返回 t，k=1 返回 other。
+func (t Tokens) Mix(other Tokens, k float32) Tokens {
+	if k <= 0 {
+		return t
+	}
+	if k >= 1 {
+		return other
+	}
+	mix := func(a, b ui.Color) ui.Color { return a.Mix(b, k) }
+	return Tokens{
+		WinFill:    mix(t.WinFill, other.WinFill),
+		WinStroke:  mix(t.WinStroke, other.WinStroke),
+		Sidebar:    mix(t.Sidebar, other.Sidebar),
+		Card:       mix(t.Card, other.Card),
+		CardStroke: mix(t.CardStroke, other.CardStroke),
+		Text:       mix(t.Text, other.Text),
+		TextMuted:  mix(t.TextMuted, other.TextMuted),
+		TextFaint:  mix(t.TextFaint, other.TextFaint),
+		Accent:     mix(t.Accent, other.Accent),
+		AccentSoft: mix(t.AccentSoft, other.AccentSoft),
+		Good:       mix(t.Good, other.Good),
+		Danger:     mix(t.Danger, other.Danger),
+		Radius:     t.Radius + (other.Radius-t.Radius)*k,
+	}
+}
+
 // Character 是一个角色主题包。
 type Character struct {
 	ID     string

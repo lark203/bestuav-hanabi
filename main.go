@@ -8,13 +8,16 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/settings"
 	"bestuav-hanabi/internal/view"
 )
 
 func main() {
-	a := view.NewApp()
-
 	mygo.App.WhenReady(func() {
+		// 先读用户设置：启动主题、字号、动效开关都在这里恢复。
+		a := view.NewAppWithSettings(settings.Load())
+		// 退出前把还没落盘的拖动/开关写掉（平时是 300ms 防抖保存）。
+		mygo.App.OnQuit(a.FlushSettings)
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title:     "花火 HanaBi",
 			Width:     1280,

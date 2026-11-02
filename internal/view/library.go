@@ -71,18 +71,22 @@ func (a *App) pageHeader(c *ui.Context) {
 	ui.Row(c).AlignItems(ui.End).Children(func() {
 		ui.Column(c).Gap(3).Grow(1).Children(func() {
 			ui.Row(c).AlignItems(ui.End).Gap(9).Children(func() {
-				ui.Text(c, "主题").FontSize(27).Bold().TextColor(a.tok.Text)
-				ui.Text(c, "APPEARANCE").FontSize(9).TextColor(a.tok.TextFaint).
+				ui.Text(c, "主题").FontSize(a.fs(27)).Bold().TextColor(a.tok.Text)
+				ui.Text(c, "APPEARANCE").FontSize(a.fs(9)).TextColor(a.tok.TextFaint).
 					Padding(0, 0, 4, 0)
 			})
-			ui.Text(c, "给工作空间，一点自己的气质。").FontSize(12).TextColor(a.tok.TextMuted)
+			ui.Text(c, "给工作空间，一点自己的气质。").FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
 		})
-		a.segmented(c, []string{"主题库", "外观与启动"}, 0)
+		a.segmented(c, []string{"主题库", "外观与启动"}, 0, func(i int) {
+			if i == 1 {
+				a.goPage(c, "settings")
+			}
+		})
 	})
 }
 
-// segmented 画一个分段控件（当前只有第一段是可用页，第二段是占位）。
-func (a *App) segmented(c *ui.Context, items []string, active int) {
+// segmented 画分段控件；onSelect 收到被点的那一段。
+func (a *App) segmented(c *ui.Context, items []string, active int, onSelect func(int)) {
 	row := ui.Row(c).Padding(3).Radius(10).Gap(2).
 		Background(ui.RGBA(8, 14, 24, 0.42))
 	row.Children(func() {
@@ -94,9 +98,16 @@ func (a *App) segmented(c *ui.Context, items []string, active int) {
 			if on {
 				seg.Background(a.tok.AccentSoft)
 				color = a.tok.Text
+			} else if seg.Hovered() {
+				seg.Background(ui.RGBA(255, 255, 255, 0.07))
+				color = a.tok.Text
+			}
+			if seg.Clicked() && onSelect != nil {
+				i := i
+				onSelect(i)
 			}
 			seg.Children(func() {
-				ui.Text(c, it).FontSize(11).TextColor(color)
+				ui.Text(c, it).FontSize(a.fs(11)).TextColor(color)
 			})
 		}
 	})
@@ -118,7 +129,7 @@ func (a *App) elementFilter(c *ui.Context) {
 	row := ui.Row(c).Height(40).Padding(4).Radius(10).AlignItems(ui.Center).Gap(2).
 		Background(ui.RGBA(8, 14, 24, 0.42))
 	row.Children(func() {
-		ui.Text(c, "元素").FontSize(10).TextColor(a.tok.TextFaint).Padding(0, 10)
+		ui.Text(c, "元素").FontSize(a.fs(10)).TextColor(a.tok.TextFaint).Padding(0, 10)
 
 		a.filterChip(c, "全部", a.filter < 0, func() { a.filter = -1 })
 		for _, el := range order {
@@ -128,7 +139,7 @@ func (a *App) elementFilter(c *ui.Context) {
 
 		ui.Spacer(c)
 		ui.Text(c, fmt.Sprintf("%d 个角色主题", count)).
-			FontSize(10).TextColor(a.tok.TextFaint).Padding(0, 12, 0, 0)
+			FontSize(a.fs(10)).TextColor(a.tok.TextFaint).Padding(0, 12, 0, 0)
 	})
 }
 
@@ -145,7 +156,7 @@ func (a *App) filterChip(c *ui.Context, label string, on bool, onClick func()) {
 		onClick()
 	}
 	chip.Children(func() {
-		ui.Text(c, label).FontSize(11).TextColor(color)
+		ui.Text(c, label).FontSize(a.fs(11)).TextColor(color)
 	})
 }
 
@@ -225,7 +236,7 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 			ui.Row(c).Height(40)
 		}
 
-		ui.Text(c, ch.NameEN).FontSize(26).
+		ui.Text(c, ch.NameEN).FontSize(a.fs(26)).
 			Font("Georgia, Cambria, 'Times New Roman', serif").
 			TextColor(ui.RGBA(255, 248, 235, .94))
 
@@ -235,7 +246,7 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 		// 对勾徽章贴卡片最右边（参考图位置）：文字 Grow(1) 顶开。
 		ui.Row(c).AlignItems(ui.Center).Gap(7).Children(func() {
 			// 参考图里角色短句用元素色，不是纯白——元素感主要来自这行小字。
-			ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(12).
+			ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(a.fs(12)).
 				TextColor(ch.Tok.Accent.Alpha(0.92)).Grow(1)
 			if active {
 				ui.Row(c).Width(16).Height(16).Draw(func(p *ui.Painter, r ui.Rect) {
@@ -257,6 +268,6 @@ func (a *App) placeholderPage(c *ui.Context) {
 			title = it.label
 		}
 	}
-	ui.Text(c, title).FontSize(22).Bold().TextColor(a.tok.Text)
-	ui.Text(c, "该页面尚未实现（骨架阶段）。").FontSize(12).TextColor(a.tok.TextFaint)
+	ui.Text(c, title).FontSize(a.fs(22)).Bold().TextColor(a.tok.Text)
+	ui.Text(c, "该页面尚未实现（骨架阶段）。").FontSize(a.fs(12)).TextColor(a.tok.TextFaint)
 }
