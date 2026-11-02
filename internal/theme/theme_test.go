@@ -99,3 +99,32 @@ func TestPresentationData(t *testing.T) {
 		t.Errorf("甘雨的命之座不对：%q", g.Constellation)
 	}
 }
+
+// TestThemeEffects 钉住每个角色的窗口按钮与纹样，避免加角色时忘配。
+func TestThemeEffects(t *testing.T) {
+	want := map[string]struct {
+		chrome   Chrome
+		ornament Ornament
+	}{
+		"ganyu":   {ChromeCrystal, OrnamentQingxin},
+		"yoimiya": {ChromePyro, OrnamentGoldfish},
+		"yae":     {ChromeElectro, OrnamentSakura},
+		"nahida":  {ChromeDendro, OrnamentSprig},
+		"furina":  {ChromeHydro, OrnamentTopHat},
+		"faruzan": {ChromeAnemo, OrnamentPolyhedron},
+		"zhongli": {ChromeGeo, OrnamentStoneSeal},
+	}
+	for id, w := range want {
+		c, ok := ByID(id)
+		if !ok {
+			t.Errorf("找不到角色 %s", id)
+			continue
+		}
+		if c.Chrome != w.chrome {
+			t.Errorf("%s 的 Chrome 应为 %d，实际 %d", id, w.chrome, c.Chrome)
+		}
+		if c.Ornament != w.ornament {
+			t.Errorf("%s 的 Ornament 应为 %d，实际 %d", id, w.ornament, c.Ornament)
+		}
+	}
+}

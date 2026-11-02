@@ -2,7 +2,6 @@
 package view
 
 import (
-	"math"
 	"math/rand/v2"
 	"time"
 
@@ -501,8 +500,14 @@ func (a *App) elementMark(c *ui.Context, size float32) {
 func (a *App) elementMarkSoft(c *ui.Context, size float32) {
 	ui.Row(c).Width(size).Height(size).Draw(func(p *ui.Painter, r ui.Rect) {
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
-		if a.char.Ornament == theme.OrnamentQingxin {
-			qingxin(p, cx, cy, size*0.45, ui.RGBA(188, 218, 232, .35), -math.Pi/2)
+		if a.char.Ornament != theme.OrnamentNone {
+			t := float32(p.Now().Sub(a.t0).Seconds())
+			if a.char.Ornament == theme.OrnamentQingxin {
+				// 甘雨侧栏的清心纹沿用参考的 -90° 朝向和更淡的冰蓝。
+				qingxin(p, cx, cy, size*.45, ui.RGBA(188, 218, 232, .35), -1.5707964)
+				return
+			}
+			ornamentSignature(p, a.char.Ornament, cx, cy, size*.46, a.tok.Accent.Alpha(.55), t)
 			return
 		}
 		glow(p, cx, cy, size*0.52, a.tok.Accent, 0.22)
@@ -581,8 +586,8 @@ func (a *App) navRow(c *ui.Context, id, label string, icon *ui.SVG) {
 		if active {
 			ui.Row(c).Width(18).Height(18).Draw(func(p *ui.Painter, r ui.Rect) {
 				cx, cy := r.X+r.W/2, r.Y+r.H/2
-				if a.char.Ornament == theme.OrnamentQingxin {
-					qingxin(p, cx, cy, r.W*0.50, a.tok.Accent.Alpha(.5), 0)
+				if a.char.Ornament != theme.OrnamentNone {
+					a.navOrnament(p, cx, cy, r.W*0.50)
 					return
 				}
 				glyph(p, a.char.Motif, cx, cy, r.W*0.44, a.tok.Accent, 0.85, 0)
@@ -667,8 +672,8 @@ func (a *App) winButton(c *ui.Context, idx int, icon *ui.SVG, tip string, action
 		action()
 	}
 
-	if a.char.Chrome == theme.ChromeCrystal {
-		btn.Draw(func(p *ui.Painter, r ui.Rect) { a.crystalButton(p, r, idx, hv) })
+	if a.char.Chrome != theme.ChromePlain {
+		btn.Draw(func(p *ui.Painter, r ui.Rect) { a.chromeButton(p, r, idx, hv) })
 		return
 	}
 
@@ -771,10 +776,10 @@ func (a *App) content(c *ui.Context) {
 	ui.Column(c).Grow(1).Clip().
 		Draw(func(p *ui.Painter, r ui.Rect) {
 			p.Fill(r, ui.RGBA(6, 11, 18, 0.28), 0)
-			// 甘雨：内容区右下角一枚很大的淡清心纹（参考 ganyu_ui.cpp::Chrome）。
+			// 角色主题：内容区右下角一枚很大的淡纹（参考各角色 _ui.cpp 的 Chrome）。
 			// 画在暗色底之后、页面之前，所以它垫在卡片与文字下面。
-			if a.char.Ornament == theme.OrnamentQingxin {
-				qingxin(p, r.X+r.W-45, r.Y+r.H-40, 61, ui.RGBA(176, 217, 235, .11), .1)
+			if a.char.Ornament != theme.OrnamentNone {
+				a.drawChromeOrnament(p, r)
 			}
 		}).
 		Children(func() {

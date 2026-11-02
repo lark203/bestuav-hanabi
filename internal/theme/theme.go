@@ -117,6 +117,18 @@ const (
 	ChromePlain Chrome = iota
 	// ChromeCrystal 是冰晶切角：八边形切角 + 淡金线 + 冰晶化的三个图标（甘雨）。
 	ChromeCrystal
+	// ChromePyro 暖金圆角 + 顶部金线 + 圆弧图标（宵宫）。
+	ChromePyro
+	// ChromeElectro 紫调圆角 + 金弧 + 樱瓣/菱形图标（八重神子）。
+	ChromeElectro
+	// ChromeDendro 深绿大圆角 + 叶弧 + 方/点图标（纳西妲）。
+	ChromeDendro
+	// ChromeHydro 蓝调圆角 + 银弧 + 水滴/方图标（芙宁娜）。
+	ChromeHydro
+	// ChromeAnemo 切角八边形 + 金线 + 顶部三角（珐露珊）。
+	ChromeAnemo
+	// ChromeGeo 切角八边形 + 金线 + 底部横线（钟离）。
+	ChromeGeo
 )
 
 // Ornament 是侧栏、卡片与内容区上的角色专属纹样。
@@ -127,6 +139,18 @@ const (
 	OrnamentNone Ornament = iota
 	// OrnamentQingxin 是璃月的清心纹 + 中国结 + 风纹（甘雨）。
 	OrnamentQingxin
+	// OrnamentGoldfish 金鱼 + 烟花（宵宫）。
+	OrnamentGoldfish
+	// OrnamentSakura 樱花 + 御守（八重神子）。
+	OrnamentSakura
+	// OrnamentSprig 叶枝 + 新芽（纳西妲）。
+	OrnamentSprig
+	// OrnamentTopHat 礼帽 + 水波（芙宁娜）。
+	OrnamentTopHat
+	// OrnamentPolyhedron 棱晶 + 古书（珐露珊）。
+	OrnamentPolyhedron
+	// OrnamentStoneSeal 岩印 + 回纹（钟离）。
+	OrnamentStoneSeal
 )
 
 // Tokens 是一套角色主题的调色板。
@@ -309,16 +333,18 @@ var all = []Character{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
 		Motto: "琉焰华舞", Constellation: "C A R A S S I U S   A U R A T U S",
 		Scene: "稻妻 · 夏祭", SceneEN: "FIREWORKS AT DUSK",
-		Element: Pyro, Motif: MotifFlame, WallTint: 0.18, Scrim: 0.47,
-		CardBg: ui.Hex("#3E2418"), Art: ArtFirework,
+		Element: Pyro, Motif: MotifFlame, Chrome: ChromePyro, Ornament: OrnamentGoldfish,
+		WallTint: 0.18, Scrim: 0.47,
+		CardBg: ui.Hex("#3E2418"), Art: ArtNone,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
 	},
 	{
 		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko", Epithet: "神樱",
 		Motto: "浮世笑百姿", Constellation: "D I V I N A   V U L P E S",
 		Scene: "鸣神 · 神樱", SceneEN: "SACRED SAKURA",
-		Element: Electro, Motif: MotifBolt, WallTint: 0.15, Scrim: 0.66,
-		CardBg: ui.Hex("#37203F"), Art: ArtSakura,
+		Element: Electro, Motif: MotifBolt, Chrome: ChromeElectro, Ornament: OrnamentSakura,
+		WallTint: 0.15, Scrim: 0.66,
+		CardBg: ui.Hex("#37203F"), Art: ArtNone,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
 	},
 	// 以下角色有自己的壁纸与专属 Motif（草叶 / 水滴 / 风纹）。
@@ -326,24 +352,27 @@ var all = []Character{
 		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Epithet: "新芽",
 		Motto: "白草净华", Constellation: "S A P I E N T I A   O R O M A S D I S",
 		Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
-		Element: Dendro, Motif: MotifLeaf, WallTint: 0.15, Scrim: 0.66,
-		CardBg: ui.Hex("#1F3A22"), Art: ArtLeaf,
+		Element: Dendro, Motif: MotifLeaf, Chrome: ChromeDendro, Ornament: OrnamentSprig,
+		WallTint: 0.15, Scrim: 0.66,
+		CardBg: ui.Hex("#1F3A22"), Art: ArtNone,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
 	},
 	{
 		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
 		Motto: "不休独舞", Constellation: "A N I M U L A   C H O R A G I",
 		Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
-		Element: Hydro, Motif: MotifWave, WallTint: 0.14, Scrim: 0.35,
-		CardBg: ui.Hex("#15294A"), Art: ArtSail,
+		Element: Hydro, Motif: MotifWave, Chrome: ChromeHydro, Ornament: OrnamentTopHat,
+		WallTint: 0.14, Scrim: 0.35,
+		CardBg: ui.Hex("#15294A"), Art: ArtNone,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
 	},
 	{
 		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
 		Motto: "百巧千机", Constellation: "F L O S C U L I   I M P L E X I",
 		Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
-		Element: Anemo, Motif: MotifWind, WallTint: 0.16, Scrim: 0.47,
-		CardBg: ui.Hex("#17342F"), Art: ArtCrystal,
+		Element: Anemo, Motif: MotifWind, Chrome: ChromeAnemo, Ornament: OrnamentPolyhedron,
+		WallTint: 0.16, Scrim: 0.47,
+		CardBg: ui.Hex("#17342F"), Art: ArtNone,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
 	},
 	{
@@ -352,8 +381,9 @@ var all = []Character{
 		ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Epithet: "岩契",
 		Motto: "尘世闲游", Constellation: "L A P I S   D E I",
 		Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
-		Element: Geo, Motif: MotifGeo, WallTint: 0.18, Scrim: 0.62,
-		CardBg: ui.Hex("#392C14"), Art: ArtRing,
+		Element: Geo, Motif: MotifGeo, Chrome: ChromeGeo, Ornament: OrnamentStoneSeal,
+		WallTint: 0.18, Scrim: 0.62,
+		CardBg: ui.Hex("#392C14"), Art: ArtNone,
 		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),
 	},
 }

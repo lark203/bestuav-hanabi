@@ -185,20 +185,20 @@ func (a *App) filterChip(c *ui.Context, label string, on bool, onClick func()) {
 	})
 }
 
-// characterCard 单张角色卡片：纯色底 + 专属线稿，元素标识，中间英文名，
+// characterCard 单张角色卡片：纯色底 + 角色纹样，元素标识，中间英文名，
 // 底部「中文名·属性」；当前主题加元素色描边。
 //
 // 两种画法：
-//   - 通用卡：左上小徽记 + 右侧 cardArt 线稿；
-//   - 清心纹卡（甘雨）：按参考图把元素徽记放大放在 (36,31)，右上清心花、
-//     三条风纹横贯卡面、右缘挂淡金中国结。徽记因此不占布局（它被 Spacer
-//     顶到底部，英文名位置不变）。
+//   - 角色纹样卡（现在七个角色都用）：按参考图把元素徽记放大放在 (36,31)，
+//     右上画角色纹样（清心花/金鱼/樱花/叶枝/礼帽/棱晶/岩印），
+//     徽记不占布局，英文名位置不变；
+//   - 通用卡：OrnamentNone 的兜底，左上小徽记 + 右侧 cardArt 线稿。
 //
 // 为什么不用壁纸缩略图：一张 4K 插画缩到 246×142 只剩一团色块，
-// 七张并排时彼此难分；纯色 + 线稿既保证一排卡片色彩分明，也让每张有图形记忆点。
+// 七张并排时彼此难分；纯色 + 纹样既保证一排卡片色彩分明，也让每张有图形记忆点。
 func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 	active := ch.ID == a.char.ID
-	qingxinCard := ch.Ornament == theme.OrnamentQingxin
+	ornamentCard := ch.Ornament != theme.OrnamentNone
 
 	card := ui.Column(c).Width(cardW).Height(142).Padding(15, 14).
 		Radius(a.tok.Radius).Border(1, ui.RGBA(255, 255, 255, 0.10)).
@@ -217,15 +217,11 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 			ui.RGBA(255, 255, 255, 0.16), 0)
 
 		p.Clip(r, a.tok.Radius, func() {
-			if qingxinCard {
-				// 清心纹卡：风纹在底，花与结在上，元素徽记再压一层。
-				windLines(p, r)
+			if ornamentCard {
+				// 角色纹样卡：纹样在底，元素徽记压在上层（参考各角色 _ui.cpp 的 Card）。
 				t := float32(p.Now().Sub(a.t0).Seconds())
-				qingxin(p, r.X+r.W-81, r.Y+57, 36,
-					ui.RGBA(176, 223, 236, .35),
-					-.3+.025*sinf(float64(t)*.25))
-				chineseKnot(p, r.X+r.W-29, r.Y+12, 1, t)
-				// 参考图的冰元素徽记在卡片内 (36,31)、半径 17，带一层浅辉光。
+				cardOrnament(p, r, ch, t)
+				// 参考图的元素徽记在卡片内 (36,31)、半径 17，带一层浅辉光。
 				cx, cy := r.X+36, r.Y+31
 				glow(p, cx, cy, 34, ch.Tok.Accent, .22)
 				glyph(p, ch.Motif, cx, cy, 17, ch.Tok.Accent, .95, 0)
@@ -248,8 +244,8 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 	}
 
 	card.Children(func() {
-		// 通用卡的左上角小徽记；清心纹卡的徽记已画在卡片内，不占布局。
-		if !qingxinCard {
+		// 通用卡的左上角小徽记；角色纹样卡的徽记已画在卡片内，不占布局。
+		if !ornamentCard {
 			ui.Row(c).Width(22).Height(22).Draw(func(p *ui.Painter, r ui.Rect) {
 				glyph(p, ch.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.40,
 					ch.Tok.Accent, 0.95, 0)
@@ -257,7 +253,7 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 			// 徽记 22 + 18 = 40，让英文名从卡片顶部 15+40=55 开始（参考图 y+55）。
 			ui.Row(c).Height(18)
 		} else {
-			// 清心纹卡没有布局里的小徽记，用 40 的固定空档对齐同一个基线。
+			// 角色纹样卡没有布局里的小徽记，用 40 的固定空档对齐同一个基线。
 			ui.Row(c).Height(40)
 		}
 
