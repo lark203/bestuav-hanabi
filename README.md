@@ -201,6 +201,8 @@ go tool mygo build -upload
 
 ## 自动构建（GitHub Actions）
 
+详细步骤见 [docs/github-release.md](docs/github-release.md)。
+
 `.github/workflows/release.yml` 在推送 `v*` tag 时创建 draft release，按
 Windows / macOS / Linux 三个 runner 串行构建并上传安装包、更新压缩包和 manifest。
 原生 UI 不需要 Bun；Windows 安装包在 Windows runner 上生成。

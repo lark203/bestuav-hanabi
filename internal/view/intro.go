@@ -38,6 +38,10 @@ func (a *App) introLayer(p *ui.Painter, r ui.Rect) {
 	if a.intro == nil {
 		a.intro = intro.New(r.W, r.H)
 		a.introAt = now
+	} else {
+		// 开场播放期间切全屏/最大化：把当前绘制区域同步给 Intro，
+		// 否则 Pose 仍按旧窗口尺寸算中心，标识会偏在一侧。
+		a.intro.Resize(r.W, r.H)
 	}
 	dt := float32(now.Sub(a.introAt).Seconds())
 	a.introAt = now

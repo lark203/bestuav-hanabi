@@ -67,6 +67,19 @@ func New(w, h float32) *Intro {
 	return in
 }
 
+// Resize 更新开场的舞台尺寸，不重置时间轴。
+//
+// 全屏切换/窗口最大化发生在开场播放期间时，Intro 的 W/H 还是旧尺寸，
+// Pose 会按旧画面中心定位，标识看起来偏左/偏上。每帧把当前绘制区域
+// 同步进来，粒子坐标本来就是归一化的，不需要重铺。
+func (in *Intro) Resize(w, h float32) {
+	w, h = max32(w, 1), max32(h, 1)
+	if w == in.W && h == in.H {
+		return
+	}
+	in.W, in.H = w, h
+}
+
 func (in *Intro) reset() {
 	in.T = 0
 	in.finished, in.skipped = false, false
