@@ -23,6 +23,9 @@
   macOS dmg、Linux deb/tar.gz、各平台 `update-*.json`。
 - 代码已 bump 到 **0.1.1**（全屏修复 + 新图标），tag `v0.1.1` 已推送，
   Actions 正在构建；构建完成后发布 draft。
+- **v0.1.2 已推送 dev / main**：动态壁纸补全（六个主题的动效 + 八重/宵宫人物），
+  `mygo.json` 已 bump 到 `0.1.2`；打 `v0.1.2` tag 后 Actions 会生成 draft release。
+  素材体积涨到约 21MB，仍随仓库提交，runner 不需要额外下载。
 - `MYGO_UPDATER_PRIVATE_KEY` 已配置。换仓库/重建时要重新配置。
 - **注意**：v0.1.0 的构建时间早于「全屏开场不居中」修复和新图标；要拿到这些必须发 0.1.1。
 

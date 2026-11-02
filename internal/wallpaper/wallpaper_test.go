@@ -9,9 +9,8 @@ import (
 	"bestuav-hanabi/internal/assets"
 )
 
-// 测试用的画布尺寸：16:9，与素材（bg 3840×2160 / shake-opacity 1920×1080 /
-// flow-mask 960×540 / wave-a 1920×1080）同比例，这样 Cover 不做裁切，
-// 屏幕坐标与遮罩坐标一一对应。
+// 测试用的画布尺寸：16:9，与素材（bg 3840×2160 / person、hair 1920×1080）同比例，
+// 这样 Cover 不做裁切，屏幕坐标与遮罩坐标一一对应。
 const (
 	testW, testH = 320, 180
 )
@@ -27,7 +26,7 @@ const (
 )
 
 // 人物轮廓遮罩的实测边界（相对百分比，取整），用作断言基准。
-// shake-opacity 实测：非零 4.9%，bbox x 34.2%~59.4% / y 22.2%~73.7%。
+// 甘雨的 person.png 实测：非零 4.9%，bbox x 34.2%~59.4% / y 22.2%~73.7%。
 const (
 	personLoX, personHiX = 34, 59
 	personLoY, personHiY = 22, 74
@@ -36,13 +35,12 @@ const (
 // testFlow 构造测试用的动态素材（与甘雨主题同源）。缺素材返回 nil。
 func testFlow(t *testing.T) *Flow {
 	t.Helper()
-	person := assets.Bitmap("ganyu/ganyu-shake-opacity.png")
-	veil := assets.Bitmap("ganyu/ganyu-flow-mask.png")
-	wave := assets.Bitmap("ganyu/ganyu-wave-a.png")
-	if person == nil || veil == nil || wave == nil {
+	person := assets.Bitmap("ganyu/person.png")
+	hair := assets.Bitmap("ganyu/hair.png")
+	if person == nil || hair == nil {
 		return nil
 	}
-	return &Flow{Person: person, Veil: veil, Wave: wave, Breath: testBreath, Sway: testSway}
+	return &Flow{Person: person, Hair: hair, Breath: testBreath, Sway: testSway}
 }
 
 // render 用指定时钟与强度渲染一小块壁纸（尺寸小是为了让 CPU 解释器跑得快）。

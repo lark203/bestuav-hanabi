@@ -32,25 +32,36 @@ func TestCharacters(t *testing.T) {
 		if c.WallTint < 0 || c.WallTint > 1 {
 			t.Errorf("%s 的 WallTint 越界：%.2f", c.ID, c.WallTint)
 		}
-		// 呼吸与发丝幅度都要极小：超过 0.02 就不像呼吸，像整幅画面在晃。
-		if c.PersonBreath < 0 || c.PersonBreath > 0.01 {
-			t.Errorf("%s 的 PersonBreath 越界：%.4f（超过 0.01 已不是呼吸的量级）", c.ID, c.PersonBreath)
+		// 幅度都要小：超过 0.01 的呼吸已经不像呼吸，超过 0.02 的发丝会被看成整幅画面在晃。
+		m := c.Motion
+		if m.Breath < 0 || m.Breath > 0.01 {
+			t.Errorf("%s 的 Breath 越界：%.4f（超过 0.01 已不是呼吸的量级）", c.ID, m.Breath)
 		}
-		if c.HairSway < 0 || c.HairSway > 0.02 {
-			t.Errorf("%s 的 HairSway 越界：%.4f（超过 0.02 会被看成整幅画面在晃）", c.ID, c.HairSway)
+		if m.Sway < 0 || m.Sway > 0.02 {
+			t.Errorf("%s 的 Sway 越界：%.4f（超过 0.02 会被看成整幅画面在晃）", c.ID, m.Sway)
+		}
+		if m.Drift < 0 || m.Drift > 0.01 {
+			t.Errorf("%s 的 Drift 越界：%.4f（环境漂移不该比呼吸大一个量级）", c.ID, m.Drift)
 		}
 		// 没有人物闸门却配了动态参数，等于配了套永远不会生效的东西——
 		// 静默失效比报错更难查，而且作者会误以为"已经动起来了"。
-		if c.PersonMask == "" && (c.PersonBreath != 0 || c.HairSway != 0 || c.HairVeil != "" || c.HairWave != "") {
-			t.Errorf("%s 没有 PersonMask 却配了呼吸/发丝参数，不会生效", c.ID)
+		if m.Person == "" && (m.Breath != 0 || m.Sway != 0 || m.Hair != "" || m.Ambient != "") {
+			t.Errorf("%s 没有 person 遮罩却配了动态参数，不会生效", c.ID)
 		}
 		// 有人物闸门却没配任何动态，属于漏填。
-		if c.PersonMask != "" && c.PersonBreath == 0 && c.HairSway == 0 {
-			t.Errorf("%s 有 PersonMask 但呼吸与发丝幅度都是 0，壁纸实际是静态的", c.ID)
+		if m.Person != "" && m.Breath == 0 && m.Sway == 0 && m.Drift == 0 {
+			t.Errorf("%s 有 person 遮罩但呼吸/发丝/漂移幅度都是 0，壁纸实际是静态的", c.ID)
 		}
-		// 发丝幅度必须在有发丝层时才有意义。
-		if c.HairSway != 0 && c.HairVeil == "" && c.HairWave == "" {
-			t.Errorf("%s 设了 HairSway=%.4f 但没有任何发丝遮罩", c.ID, c.HairSway)
+		// 幅度必须在有对应遮罩时才有意义。
+		if m.Sway != 0 && m.Hair == "" {
+			t.Errorf("%s 设了 Sway=%.4f 但没有 hair 遮罩", c.ID, m.Sway)
+		}
+		if m.Drift != 0 && m.Ambient == "" {
+			t.Errorf("%s 设了 Drift=%.4f 但没有 ambient 遮罩", c.ID, m.Drift)
+		}
+		// 现在七个主题都应该有动态：漏配一个，切换过去就是一张死图。
+		if m.Person == "" || (m.Breath == 0 && m.Sway == 0) {
+			t.Errorf("%s 配不出动态壁纸（person=%q breath=%.4f sway=%.4f）", c.ID, m.Person, m.Breath, m.Sway)
 		}
 		motifs[c.Motif] = true
 	}

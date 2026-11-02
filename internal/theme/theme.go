@@ -216,6 +216,40 @@ func (t Tokens) Mix(other Tokens, k float32) Tokens {
 	}
 }
 
+// Motion 描述一张壁纸怎么动：三层遮罩 + 三组幅度。
+//
+// 这是「人物会呼吸、发丝会飘、环境在流动」的统一模型：每个角色只填参数，
+// 着色器一家管完（见 internal/wallpaper）。三层各自独立，缺素材（空路径）的层
+// 自动退化成不参与，所以加角色时可以先只填 person。
+//
+// 位移单位都是**图片 UV**（不是屏幕像素）：这样窗口放大缩小时，动的幅度
+// 相对画面恒定，和参考项目按 3840×2160 标尺写死位移的做法观感一致。
+type Motion struct {
+	// Person 是人物区域遮罩（灰度，非零处才算人物）——呼吸的总闸门：
+	// 它以外的地方严格等于原图，建筑与天空纹丝不动。空表示没有呼吸。
+	//
+	// 甘雨实测覆盖 x 34.2%~59.4% / y 22.2%~73.7%，是一条竖直的人形带（4.9%）。
+	Person string
+	// Breath 是呼吸幅度：0.0022 约合 4K 图 4.8px、周期约 4.5 秒，是静息呼吸的量级。
+	Breath float32
+	// Hair 是发丝/衣摆遮罩，R 通道是基础层、G 通道是细缕层（一张图两个通道）。
+	//
+	// 分两层是为了「一缕一缕分开飘」：两层频率、速度、方向都不同，细缕处比
+	// 周围多一份位移。两层都会被各自通道的权重压住，不会跑到人物之外。
+	Hair string
+	// Sway 是发丝飘动的幅度（图片 UV）。细缕层在着色器里再乘 1.3。
+	Sway float32
+	// Ambient 是环境漂移遮罩：只有大块柔和的区域（天空、光、雾、水）才动，
+	// 硬边建筑基本不动——它和 Person 一样是"闸门"思路，只是闸门换成"柔不柔"。
+	Ambient string
+	// Drift 是环境漂移的幅度（图片 UV）。0.0015 约合 4K 图 3.2px。
+	Drift float32
+	// DriftAngle 是漂移的方向（弧度，0 = 向右，π/2 = 向下）。
+	DriftAngle float64
+	// DriftSpeed 是漂移的相位速度倍率（1 = 标准，0 视为 0.05）。水慢、风快。
+	DriftSpeed float32
+}
+
 // Character 是一个角色主题包。
 type Character struct {
 	ID     string
@@ -247,38 +281,16 @@ type Character struct {
 	Art Art
 
 	// Bg 是壁纸在 assets/ 下的相对路径（每个角色一张，均从原项目导入）。
+	//
+	// 八重神子与宵宫的原图是**空场景**：人物在原项目里是运行时单独一层网格
+	// （.hbc）画的，所以这两张 bg.jpg 是脚本把人物合成进去后重新导出的
+	// （见 scripts/assetgen）。
 	Bg string
 	// Icon 是头像的相对路径；空表示没有头像素材，界面用元素色圆点占位。
 	Icon string
 
-	// PersonMask 是**人物区域**遮罩（灰度，非零处才算人物）——它是所有壁纸动态的
-	// 总闸门：它以外的地方严格等于原图，建筑与天空纹丝不动。
-	//
-	// 必须与 Bg 同源、构图对齐。甘雨实测覆盖 x 34.2%~59.4% / y 22.2%~73.7%，
-	// 是一条竖直的人形带，仅占画面 4.9%。
-	//
-	// 空表示该角色壁纸完全静态：不做呼吸、不做流动。
-	PersonMask string
-	// PersonBreath 是呼吸起伏的幅度，单位是图片 UV 的垂直分量。
-	// 0.0022 约等于 4K 图上 4.8px——只是几乎察觉不到的微动，符合静息呼吸。
-	//
-	// 只走垂直方向且全人物同步：呼吸时胸腔整体上下起伏，不是各部位乱飘。
-	// 周期约 4.5 秒（着色器里 sin(Time*1.4)）。
-	PersonBreath float32
-	// HairVeil 是发丝**基础层**遮罩（可选，整片发区）。会被 PersonMask 裁到人物之内。
-	//
-	// 空表示没有发丝流动。甘雨的 flow-mask 实测覆盖 x 31.5%~81.6% / y 0%~42%，
-	// 这个范围横铺到了天空和建筑上——所以它只能当"发丝层"用，绝不能当总闸门，
-	// 否则就会看到建筑和天空在动。
-	HairVeil string
-	// HairWave 是发丝**细缕层**遮罩（可选），覆盖基础层内的一小片。
-	//
-	// 分层次靠这个：两层遮罩范围不同、频率相位方向各偏开一点，累加后细缕处比
-	// 周围多一份位移，看起来才是一缕一缕分开飘。甘雨的 wave-a 实测覆盖
-	// x 46.6%~59.2% / y 26.5%~42.7%（1.08%），落在人物内。
-	HairWave string
-	// HairSway 是发丝飘动的幅度，单位是图片 UV。细缕层在着色器里乘 1.3。
-	HairSway float32
+	// Motion 是壁纸的动态配置（呼吸 / 发丝 / 环境漂移）。零值 = 完全静态。
+	Motion Motion
 
 	// WallTint 是壁纸染色的强度 0..1：0 = 保持原图颜色。
 	// 各自的壁纸色调已经贴合角色，这里只做轻微统一，通常 0.1~0.2。
@@ -331,21 +343,22 @@ var all = []Character{
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
 		// 甘雨壁纸动态，分两层机制：
 		//
-		// 1) 呼吸感：PersonMask（人物轮廓）当总闸门，只做垂直微起伏。
+		// 1) 呼吸感：Person（人物轮廓）当总闸门，只做垂直微起伏。
 		//    0.0022 约合 4K 图 4.8px、周期约 4.5 秒——静息呼吸的量级。
 		//    闸门之外（建筑、天空）严格等于原图，一个像素都不动。
 		//
-		// 2) 发丝分层：HairVeil（整片发区）+ HairWave（一缕细层）叠出层次。
+		// 2) 发丝分层：Hair 的 R（整片发区）+ G（一缕细层）叠出层次。
 		//    两者都会被人物闸门裁到人物之内——这是关键：flow-mask 本身覆盖
 		//    y 0%~42% 的横带、含天空与建筑，只能当发丝层，绝不能当总闸门。
 		//
 		// 关于 wave-b：实测 bbox y 0%~20.3%，落在人物轮廓（y 从 22.2% 起）之上，
 		// 被闸门裁掉后几乎不剩，故不启用。
-		PersonMask:   "ganyu/ganyu-shake-opacity.png",
-		PersonBreath: 0.0022,
-		HairVeil:     "ganyu/ganyu-flow-mask.png",
-		HairWave:     "ganyu/ganyu-wave-a.png",
-		HairSway:     0.0016,
+		//
+		// 甘雨**不配 Ambient**：璃月的建筑和天空是硬边，整幅环境漂移会露馅。
+		Motion: Motion{
+			Person: "ganyu/person.png", Breath: 0.0022,
+			Hair: "ganyu/hair.png", Sway: 0.0016,
+		},
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
@@ -355,15 +368,40 @@ var all = []Character{
 		WallTint: 0.18, Scrim: 0.47,
 		CardBg: ui.Hex("#3E2418"), Art: ArtNone,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
+		// 宵宫：人物从 .hbc 网格烤进背景图（原图的背景是没有人的空场景）。
+		//
+		// 她的 .hbc 每层遮罩都是空的（1×1），拿不到发丝权重，所以发丝区按
+		// 「头顶一团 + 左侧发梢」两个椭圆取，再乘人物遮罩，保证不会飘出人物。
+		// 环境漂移给 0.0014：夏祭的暖光在流动，纸烟花本身是平的，动起来不违和。
+		Motion: Motion{
+			Person: "yoimiya/person.png", Breath: 0.0018,
+			Hair: "yoimiya/hair.png", Sway: 0.0024,
+			Ambient: "yoimiya/ambient.png", Drift: 0.0014, DriftAngle: 0.9, DriftSpeed: 0.6,
+		},
 	},
 	{
 		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko", Epithet: "神樱",
 		Motto: "浮世笑百姿", Constellation: "D I V I N A   V U L P E S",
 		Scene: "鸣神 · 神樱", SceneEN: "SACRED SAKURA",
 		Element: Electro, Motif: MotifBolt, Opening: OpeningYae, Chrome: ChromeElectro, Ornament: OrnamentSakura,
-		WallTint: 0.15, Scrim: 0.66,
+		// 压暗值按合成后壁纸的实测亮度给（0.70 → 0.32+0.38×0.55 ≈ 0.53，取 0.56 留一点余量）。
+		// 原背景是一整片亮樱色（0.81），烤进人物后暗部变多，0.66 会把人物压得看不清。
+		WallTint: 0.15, Scrim: 0.56,
 		CardBg: ui.Hex("#37203F"), Art: ArtNone,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
+		// 八重神子：原图的背景只有樱花枝（人物也是 .hbc 网格，已烤进 bg.jpg）。
+		//
+		// 遮罩全部从 .hbc 的图层推出来：人物 = 所有图层的 alpha 并集；发丝基础层 =
+		// 各图层自带的 mask.r（原项目就是拿它做发丝位移的）按 alpha 加权取并集；
+		// 细缕层 = 其中权重最大的一层（实测是右侧那条长辫，正好是最该飘的地方）。
+		// 所以她的发丝权重是「数据驱动」的，不是手画椭圆。
+		//
+		// 环境漂移 0.0018：整幅都是虚化的樱色天空，风一吹整片花瓣都在走。
+		Motion: Motion{
+			Person: "yae/person.png", Breath: 0.0020,
+			Hair: "yae/hair.png", Sway: 0.0026,
+			Ambient: "yae/ambient.png", Drift: 0.0018, DriftAngle: 0.45, DriftSpeed: 0.5,
+		},
 	},
 	// 以下角色有自己的壁纸与专属 Motif（草叶 / 水滴 / 风纹）。
 	{
@@ -374,6 +412,14 @@ var all = []Character{
 		WallTint: 0.15, Scrim: 0.66,
 		CardBg: ui.Hex("#1F3A22"), Art: ArtNone,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
+		// 纳西妲：整幅都是她的特写。人物遮罩从「细节强度」推（虚化的背景细节少、
+		// 脸和手细节多），发丝直接用原项目做横向波动的 nahida-wave.png。
+		// 梦境本来就该慢慢流动，环境漂移给 0.0012、速度 0.35。
+		Motion: Motion{
+			Person: "nahida/person.png", Breath: 0.0016,
+			Hair: "nahida/hair.png", Sway: 0.0020,
+			Ambient: "nahida/ambient.png", Drift: 0.0012, DriftAngle: 0.15, DriftSpeed: 0.35,
+		},
 	},
 	{
 		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
@@ -383,6 +429,13 @@ var all = []Character{
 		WallTint: 0.14, Scrim: 0.35,
 		CardBg: ui.Hex("#15294A"), Art: ArtNone,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
+		// 芙宁娜：发丝遮罩用原项目的 furina-sway.png（就是她发梢的形状），
+		// 人物遮罩从细节强度推。水下光线本来就慢，漂移速度压到 0.3。
+		Motion: Motion{
+			Person: "furina/person.png", Breath: 0.0018,
+			Hair: "furina/hair.png", Sway: 0.0024,
+			Ambient: "furina/ambient.png", Drift: 0.0014, DriftAngle: 0.1, DriftSpeed: 0.3,
+		},
 	},
 	{
 		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
@@ -392,6 +445,13 @@ var all = []Character{
 		WallTint: 0.16, Scrim: 0.47,
 		CardBg: ui.Hex("#17342F"), Art: ArtNone,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
+		// 珐露珊：原项目只有一张流向图（没有遮罩），发丝区按「头顶 + 左侧马尾」
+		// 两个椭圆取，再乘人物遮罩。风元素，漂移速度给到 0.5、方向偏右上。
+		Motion: Motion{
+			Person: "faruzan/person.png", Breath: 0.0016,
+			Hair: "faruzan/hair.png", Sway: 0.0024,
+			Ambient: "faruzan/ambient.png", Drift: 0.0015, DriftAngle: 0.55, DriftSpeed: 0.5,
+		},
 	},
 	{
 		// 钟离的壁纸原项目只有 .hbw 打包格式，这里是从中提取图层合成出的静态图
@@ -403,6 +463,14 @@ var all = []Character{
 		WallTint: 0.18, Scrim: 0.62,
 		CardBg: ui.Hex("#392C14"), Art: ArtNone,
 		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),
+		// 钟离：壁纸是 .hbw 分层容器，人物是第 7 层（id=85），发丝权重取该层
+		// 自带的 mask.r；环境漂移取「柔光区域 + 胸口金色漩涡」——漩涡转起来，
+		// 沙漠的硬边和岩印不动。
+		Motion: Motion{
+			Person: "zhongli/person.png", Breath: 0.0016,
+			Hair: "zhongli/hair.png", Sway: 0.0020,
+			Ambient: "zhongli/ambient.png", Drift: 0.0016, DriftAngle: 0, DriftSpeed: 0.3,
+		},
 	},
 }
 

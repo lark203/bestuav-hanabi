@@ -13,3 +13,7 @@
 .DS_Store
 Thumbs.db
 *.log
+
+# Python 资源脚本的缓存
+__pycache__/
+*.pyc

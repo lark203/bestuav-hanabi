@@ -2,6 +2,7 @@
 package view
 
 import (
+	"math"
 	"math/rand/v2"
 	"time"
 
@@ -182,27 +183,31 @@ func (a *App) FlushSettings() {
 	a.dirty = false
 }
 
-// wallpaperFlowFor 构造指定主题的壁纸动态素材；没有人形遮罩的角色返回 nil。
+// wallpaperFlowFor 构造指定主题的壁纸动态素材；没有人物遮罩（或素材缺失）时返回 nil。
 //
 // 各遮罩走 assets 缓存（缺图返回 nil，对应层自动不参与或整体退化为静态）。
 func (a *App) wallpaperFlowFor(c theme.Character) *wallpaper.Flow {
-	if c.PersonMask == "" {
+	m := c.Motion
+	if m.Person == "" {
 		return nil
 	}
-	person := assets.Bitmap(c.PersonMask)
+	person := assets.Bitmap(m.Person)
 	if person == nil {
 		return nil
 	}
 	f := &wallpaper.Flow{
-		Person: person,
-		Breath: c.PersonBreath,
-		Sway:   c.HairSway,
+		Person:     person,
+		Breath:     m.Breath,
+		Sway:       m.Sway,
+		Drift:      m.Drift,
+		DriftSpeed: m.DriftSpeed,
+		DriftDir:   [2]float32{float32(math.Cos(m.DriftAngle)), float32(math.Sin(m.DriftAngle))},
 	}
-	if c.HairVeil != "" {
-		f.Veil = assets.Bitmap(c.HairVeil)
+	if m.Hair != "" {
+		f.Hair = assets.Bitmap(m.Hair)
 	}
-	if c.HairWave != "" {
-		f.Wave = assets.Bitmap(c.HairWave)
+	if m.Ambient != "" {
+		f.Ambient = assets.Bitmap(m.Ambient)
 	}
 	return f
 }
@@ -210,10 +215,10 @@ func (a *App) wallpaperFlowFor(c theme.Character) *wallpaper.Flow {
 // wallpaperFlow 是当前主题的动态素材（开场/正常绘制用）。
 func (a *App) wallpaperFlow() *wallpaper.Flow { return a.wallpaperFlowFor(a.char) }
 
-// wallpaperKeys 是 Keep 要保留的资源：当前壁纸、头像与动态遮罩。
+// wallpaperKeys 是 Keep 要保留的资源：当前壁纸、头像与三层动态遮罩。
 func wallpaperKeys(c theme.Character) []string {
 	keep := []string{c.Bg, c.Icon}
-	for _, p := range []string{c.PersonMask, c.HairVeil, c.HairWave} {
+	for _, p := range []string{c.Motion.Person, c.Motion.Hair, c.Motion.Ambient} {
 		if p != "" {
 			keep = append(keep, p)
 		}
@@ -465,21 +470,33 @@ func (a *App) View(c *ui.Context) {
 	}
 }
 
-// drawWallpaper 画一层壁纸：着色器 + 按壁纸亮度压暗 + 顶部渐变。
+// drawWallpaper 画一层壁纸：着色器 + 按壁纸亮度压暗 + 顶部渐变 + 环境粒子。
 //
 // 过渡时旧、新两层各画一次，新层靠 Element.Opacity 淡入。壁纸显现
 // （settings.WallpaperVis）叠加到角色自带的 Scrim 上，两层各自算。
 func (a *App) drawWallpaper(p *ui.Painter, r ui.Rect, ch theme.Character,
 	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, now time.Time) {
-	elapsed := now.Sub(a.t0).Seconds()
+	a.drawWallpaperAt(p, r, ch, bg, flow, tok, now.Sub(a.t0).Seconds())
+}
+
+// drawWallpaperAt 同上，但动效时间是显式传入的秒数。
+//
+// 拆出来是为了截图/回归测试能钉住某一时刻——离屏渲染一帧要几秒，用真时钟
+// 会把动效推进一大截，两张图之间根本对不上。
+func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch theme.Character,
+	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, elapsed float64) {
 	// 着色器驱动：Cover 铺满 + 按角色元素色保亮度染色；
-	// 甘雨这类带流动图层的角色，只有遮罩内的细节（发丝）在摆，主体不动。
+	// 人物、发丝、环境三层遮罩决定"谁能动"。
 	wallpaper.Draw(p, bg, r, elapsed, a.animPlay, tok.Accent, ch.WallTint, flow)
 	scrim := a.settings.EffectiveScrim(ch.Scrim)
 	p.Fill(r, ui.RGBA(6, 12, 22, scrim), 0) // 按壁纸亮度压暗（见 Character.Scrim）
 
 	// 顶部再压一层渐变，托住标题区（在玻璃条之下，不影响玻璃本身的通透）。
 	p.FillGradient(ui.Rect{X: r.X, Y: r.Y, W: r.W, H: topScrimH}, topScrim, 0)
+
+	// 主题专属的环境粒子（樱花 / 火星 / 光尘 / 气泡 / 金屑）。
+	// 画在压暗层之上：粒子是"发光体"，被压暗会变成灰色噪点。
+	a.drawWallpaperParticles(p, r, ch, elapsed, a.animPlay)
 
 	// 下一帧：只重绘这块，不重建元素树。动效关掉时不必再请求重绘。
 	if a.animPlay > 0 {

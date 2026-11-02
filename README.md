@@ -23,10 +23,12 @@
   窗口按钮造型（Chrome）、纹样（Ornament）、命之座、壁纸染色强度
   - 主题库点卡片即切换：侧栏、卡片、文字、卡片 tint、壁纸氛围一起变，0.42 秒交叉淡入
   - **七个角色各有自己的壁纸**（均从 HanaBi-ui-Genshin 导入）：甘雨、宵宫、八重神子、纳西妲、芙宁娜、珐露珊、钟离
+  - 八重神子与宵宫的原背景是**空场景**：原项目把人物做成运行时单独一层网格（`.hbc`）叠上去的。
+    这里由脚本把人物烤进背景图，并顺手推出人物/发丝遮罩（见「动态壁纸」）
   - 钟离的壁纸原项目只提供 `.hbw` 打包格式，这里从容器里提取图层**合成**出静态图（见「已知的坑」）
   - 七种标识画法：冰晶、焰火、雷光、岩印、草叶、水珠、风纹
   - **壁纸染色在着色器里做**（按元素色重映射亮度），不是叠半透明色层——后者会把暗部提亮、糊掉细节
-  - **压暗强度按壁纸实测亮度逐个给**：甘雨 0.27 用 0.32，八重/纳西妲 0.80 用 0.66；一个统一值必然有一半不合适
+  - **压暗强度按壁纸实测亮度逐个给**：甘雨 0.27 用 0.32，八重 0.70 用 0.56，纳西妲 0.80 用 0.66；一个统一值必然有一半不合适
   - 头像：有素材用角色头像（甘雨），没有就用元素色圆 + 首字占位
   - 新增角色只改 `internal/theme/theme.go` 一条数据，页面与绘制层不动
 - **甘雨专属细节**（对照 `ganyu_ui.cpp` 逐项补齐）：
@@ -59,9 +61,25 @@
     水滴（水纹扩散）/ 风纹（回旋气流），不再把草、水、风回落到冰晶
   - 结束时标识收缩并停靠到侧栏头像位置，开场层淡出、主界面「透出来」（不切视图）
   - 点画面任意处或按 Esc 可跳过（0.9 秒内快进走完，不硬切）
-- **动态壁纸**：`internal/wallpaper/wallpaper.kage`（kage 着色器）一次绘制完成
-  「Cover 铺满 + 人物区域内的呼吸与发丝漂动 + 主题染色」，位移按图片空间计（窗口缩放观感一致）；
-  `Play` 参数可关闭动效。
+- **动态壁纸：七个主题全部有动效**（`internal/wallpaper/wallpaper.kage`，一次绘制完成
+  「Cover 铺满 + 三层遮罩位移 + 主题染色」，位移按图片空间计，窗口缩放观感一致）
+  - **三层遮罩**：`person`（人物，呼吸的总闸门）/ `hair`（R 基础层、G 细缕层）/
+    `ambient`（环境：天空、光雾、水面）。位移 = 振幅 × 遮罩，**只采样一次**——
+    遮罩外一个量化误差都不会有，硬边结构不会跟着晃
+  - **每个角色一套参数**（`internal/theme/theme.go` 的 `Motion`）：呼吸 0.0016~0.0022、
+    发丝 0.0016~0.0026、环境漂移 0.0012~0.0018（图片 UV）
+  - **发丝遮罩按素材推**：甘雨用原项目的 flow-mask / wave-a；八重神子从 `.hbc` 每层自带的
+    `mask.r` 并出来（细缕层自动落在右侧长辫上）；宵宫、珐露珊没有现成遮罩，按头部/马尾
+    椭圆取再乘人物遮罩；纳西妲用 `nahida-wave.png`；芙宁娜用 `furina-sway.png`；
+    钟离取 `.hbw` 第 7 层的 `mask.r`
+  - **环境遮罩只认「大块柔和」**：细节强度低 + 沿硬边留边距（膨胀 6px 再扣掉），
+    所以天空在流、窗框和岩印不动
+  - **主题专属环境粒子**（`internal/view/wallpaper_particles.go`）：樱花、火星、
+    梦境光尘、水汽气泡、机关浮尘、岩金碎屑；位置由「序号 + 时间」算，无状态、掉帧不漂
+  - 甘雨不配环境层与粒子（璃月的建筑/天空是硬边，保持原来的严格静止）
+  - `Play` 参数可关闭动效；关掉后画面完全静止（有测试钉住）
+  - 派生资源（`.hbc` 人物合成、人物/发丝/环境遮罩）由 `scripts/assetgen/generate.py`
+    从原项目素材生成，规则可重跑；做法与踩坑见 [docs/wallpaper-motion.md](docs/wallpaper-motion.md)
 - **12fps 后台时钟**驱动壁纸（`Painter.AnimationFrameRate`，只重绘那一层、不重建元素树）
 - **主题页双视图**：标题右侧的「主题库 / 外观与启动」只在页内切换，不再跳侧栏；
   这是外观与启动的唯一入口，侧栏「设置」不再放这些内容。
@@ -95,8 +113,10 @@
 
 - 开场与标识都是**2D 矢量近似**：原版的 3D 材质网格、逐顶点着色和体积粒子没有 1:1 复刻，
   分镜的构图/节奏/元素已经按 `characters/*/*_intro.cpp` 对齐
-- 发布：`v0.1.0` 已发布；全屏开场修复已进入 `0.1.1`，打 `v0.1.1` tag 后
-  Actions 会生成新的 draft release
+- 动态壁纸的动效是**着色器位移近似**：`.hbc` 的逐帧顶点动画（人物自带的那套发丝摆动）
+  没有复刻；纳西妲的人物遮罩是自动推断的，白发贴白背景处会有漏边
+- 发布：`v0.1.0` 已发布；全屏开场修复进入 `0.1.1`；动态壁纸补全已进入 `0.1.2`
+  （代码已推送，打 `v0.1.2` tag 即发版）
 - 壁纸页按需求保持现状（占位）；黑白基础主题暂不做；最小化退场动画待定
 
 ## 预览
@@ -112,6 +132,14 @@
 | 主题库 · 钟离（岩） |
 |---|
 | ![钟离](docs/screenshots/theme-zhongli.png) |
+
+| 动态壁纸 · 八重神子（落樱） | 动态壁纸 · 宵宫（火星） | 动态壁纸 · 纳西妲（梦境光尘） |
+|---|---|---|
+| ![八重壁纸](docs/screenshots/wallpaper-yae.png) | ![宵宫壁纸](docs/screenshots/wallpaper-yoimiya.png) | ![纳西妲壁纸](docs/screenshots/wallpaper-nahida.png) |
+
+| 动态壁纸 · 芙宁娜（水汽） | 动态壁纸 · 珐露珊（浮尘） | 动态壁纸 · 钟离（金屑） |
+|---|---|---|
+| ![芙宁娜壁纸](docs/screenshots/wallpaper-furina.png) | ![珐露珊壁纸](docs/screenshots/wallpaper-faruzan.png) | ![钟离壁纸](docs/screenshots/wallpaper-zhongli.png) |
 
 | 主题页 · 外观与启动 | 设置 · 通用 |
 |---|---|
@@ -141,7 +169,7 @@
 8. **资源根不能用「找 assets 目录」来定位**：包目录 `internal/assets` 与资源目录同名，向上查找会误命中。现在优先用 `mygo.App.Path(mygo.PathResources)`，再回退 `go.mod` 锚点。
 9. **图片解码必须缓存**：壁纸是 1200 万像素的 JPG，每帧解码会直接把帧率打到个位数（见 `internal/assets`）。
 10. **CPU 渲染器跑 kage 很慢**：离屏截图走 CPU 解释器，1280×800 一帧要数秒（`internal/view` 的测试因此要跑一分钟左右）；真机走 GPU 才够 12fps 或 60fps。写交互测试要先用小尺寸/少帧数，别在 1280×800 里跑几十帧动画。
-11. **资源不随仓库分发**：`assets/` 在 `.gitignore` 里，打包前必须在本地存在（`mygo.json` 的 `resources: ["assets"]` 会把它复制到 exe 旁）。
+11. **资源随仓库提交、但派生资源必须由脚本生成**：`assets/` 已在版本库里（约 21MB），打包时 `mygo.json` 的 `resources: ["assets"]` 会把它复制到 exe 旁；`person.png` / `hair.png` / `ambient.png` 是 `scripts/assetgen` 的产物，换素材或改参数后要重跑，别手改。
 12. **窗口按钮不要用 `—` `□` `✕` 这些字符**：字体里不一定有这些字形，缺字形时按钮变成一个空方块（试过）。通用主题用 SVG（`icons.Minimize/Maximize/Close`），各角色的专属按钮在 `chrome.go` 里用 `ui.Path` 画。
 13. **侧栏不要用 glass 材质**：`Clear` 在亮壁纸（钟离的金色、纳西妲的浅绿）上几乎不压暗，菜单文字直接糊掉；`Regular` 又自带边缘高光，上下亮出两条白边。现在直接 `Background(令牌色)`，通透感靠 alpha。
 14. **`.hbw` 是打包格式，但里面内嵌了原始 PNG/JPEG**：文件头 `HBW0001` 之后跟一串图层，偶数层是图像、奇数层是位移/遮罩纹理（**不是 alpha**，按它叠加会得到一片空白）。直接用图像层自带的 alpha 依序叠在底色上就能还原成一张壁纸——钟离那张就是这么来的。
@@ -156,6 +184,12 @@
 23. **过渡不要直接用 `time.Now` 写死**：离屏渲染一帧要几秒，真时钟会在一帧内把 0.42s 过渡走完，截图测不到中间态。`App.clock` 可注入（测试里固定时间），`themeProgress` / `pageProgress` 都从它取时间；生产默认 `time.Now`。
 24. **测试里不要用 `NewAppWithSettings` 做会触发的改动**：它 `persist=true`，`setCharacter` 会立刻写真实用户目录。要测过渡用 `NewApp`（persist=false），要测启动选择用 `NewAppWithSettings` 但不改设置。
 25. **`seg` 的圆角半径必须夹到段长的一半**：开场里一条曲线会放大到半径 200px，相邻采样点只有几像素。用 `width/2` 当圆角时，短段的圆角半径超过短边一半，渲染出来只剩两端的圆帽——叶子/气流变成一串点。现在 `arcLine` / `quadLine` 直接用 `ui.Path` + `StrokePath` 一次描边（连续、带圆角连接），`seg` 也把半径夹到 `l/2`；短装饰线才继续用 `seg`。
+26. **`.hbc` 不能当图片贴**：它是「分层贴图 + 顶点网格 + 逐帧 int16 顶点位移」的容器（`HBC0001`），原项目用 GPU 三角网格逐帧变形来画（`.hbc` 每层还带一张 512×512 的位移权重遮罩）。mygo 的 Painter 没有三角网格绘制，所以脚本把它**烤成一张中性姿势的 RGBA**（`scripts/assetgen`），再用遮罩做位移近似。顶点坐标固定按 3840×2160 标尺，按图片实际尺寸缩放会错位。
+27. **预乘 alpha 不能乘两次**：光栅化时 RGB 已经逐层预乘过一次，合成到画布时又乘了一次 alpha——半透明边缘被平方，人物轮廓上浮出一圈细暗线（远看像戴了副细框眼镜，八重神子的第一批截图就是这样）。预乘画布的合成公式是 `dst = src + dst*(1-a)`，`src.rgb` 直接加，不要再乘 `a`。
+28. **图层内部合成要用累积 alpha，不能用 `max`**：一个图层的相邻三角形有半像素重叠，接缝处颜色叠了两次、`max(alpha)` 却只算一次，接缝上同样会出描边。
+29. **软遮罩不要用「采样两次再混色」**：参考项目的 `lerp(Original(uv), Original(uv+delta), mask)` 在硬边遮罩下没问题，但遮罩羽化后混合带里会同时出现原像素和位移后的像素——人物轮廓出现重影描边。现在改成「位移量 × 遮罩、只采样一次」：`mask=0` 处 delta 严格为 0，采样点与原图完全一致。
+30. **环境漂移遮罩要沿硬边留边距**：细节强度只能把细线本身压到 0，紧挨着细线的几像素是"半柔"的，漂移起来会看到细线在抖（钟离的菱形光框、珐露珊的窗框）。做法是沿 `e > 0.3` 的硬边膨胀 6px 再扣掉。
+31. **派生壁纸资源是脚本产物、不是手改的**：`assets/<id>/person.png`、`hair.png`、`ambient.png`（以及八重/宵宫的 `bg.jpg`）由 `scripts/assetgen/generate.py` 从原项目素材生成，改了参数要重跑脚本；手改会在下次重跑时被覆盖。
 
 ## 运行
 
@@ -253,7 +287,7 @@ git push github main dev
   `APPLE_TEAM_ID`、`APPLE_APP_PASSWORD`；不加则是 ad hoc 签名，别的 Mac 上
   Gatekeeper 会拦截。
 
-`assets/` 已随仓库提交（约 18MB），runner 不需要额外下载壁纸。
+`assets/` 已随仓库提交（约 21MB），runner 不需要额外下载壁纸。
 
 ## 目录
 
@@ -263,9 +297,10 @@ mygo.json               打包配置（name/slug/version；resources 把 assets/
                         updates 更新公钥与发布目录）
 CHANGELOG.md            发布说明（mygo build 写进 update manifest）
 scripts/build-release.ps1 带更新私钥的发布构建
-internal/theme/         角色包：令牌 + 元素 + 标识画法 + 壁纸染色强度
+scripts/assetgen/       派生壁纸资源生成（.hbc 人物烤图、人物/发丝/环境遮罩）
+internal/theme/         角色包：令牌 + 元素 + 标识画法 + 壁纸染色强度 + Motion 动效参数
 internal/assets/        资源定位（resources 目录 / go.mod 锚点）+ 解码缓存
-internal/wallpaper/     wallpaper.kage + Draw：动态壁纸着色器
+internal/wallpaper/     wallpaper.kage + Draw：动态壁纸着色器（三层遮罩）
 internal/intro/         开场的时间轴、粒子与标识姿态（纯逻辑，可单测）
 internal/settings/      跨启动设置：默认值、夹取、settings.json 读写
 internal/ui/icons/      内联 SVG 图标（currentColor 跟随主题）
@@ -275,9 +310,12 @@ internal/view/          界面根：App 状态、开场渲染、侧栏、标题�
                         ornaments_ui.go：纹样在内容区/侧栏/导航/卡片上的排布
                         chrome.go：七个角色的窗口按钮造型
                         opening.go：七个角色的开场分镜与背景
+                        wallpaper_particles.go：七个角色的壁纸环境粒子
                         appearance.go：主题页的外观与启动视图
                         settings_page.go：通用设置（版本/更新、数据、关于）
                         update.go：自动更新的检查/下载/安装状态机
+                        shotdump_test.go：离屏截图（设 HANABI_SHOTS 才出图）
+docs/wallpaper-motion.md 动态壁纸的做法、参数与踩坑
 docs/screenshots/       界面截图（离屏渲染产出）
 ```
 
@@ -289,20 +327,31 @@ go test ./...          # 时间轴/粒子/姿态 + 开场渲染冒烟
 
 `internal/intro` 的测试钉住时间轴（6.20s 结束、dt 夹到 0.20）、姿态起止点（中央偏下 → 侧栏停靠点，半径 14.4 = 品牌 glyph）、
 粒子确定性（同一尺寸两次初始化完全一致）、跳过耗时（≤0.9s）以及淡出/交接的单调性。
-`internal/wallpaper` 钉住"时间推进会改变画面、`play=0` 时完全静止"。
+`internal/wallpaper` 钉住"时间推进会改变画面、`play=0` 时完全静止"、甘雨人物 bbox 之外一个像素都不动、呼吸是垂直方向。
 `internal/settings` 钉住默认值（112%、跟随当前）、越界夹取、坏 JSON 回退与读写往返。
-`internal/theme` 钉住每个角色的 Chrome / Ornament 配置。
+`internal/theme` 钉住每个角色的 Chrome / Ornament / Opening 配置，以及 `Motion`（幅度越界、配了遮罩却没有幅度、
+有幅度却没有遮罩、七个主题必须都配得出动效）。
 `internal/view` 另外钉住启动模式（跟随/固定/随机）、字号换算、主题过渡、页面入场、
-主题页视图切换与更新检查的文本/进度；离屏渲染仍是主要成本（`go test ./...` 约一分半）。
+主题页视图切换与更新检查的文本/进度；离屏渲染仍是主要成本（`go test ./...` 约两三分钟）。
+
+改完壁纸/粒子想看图时：
+
+```powershell
+$env:HANABI_SHOTS = "D:\tmp\shots"
+$env:HANABI_SHOTS_ONLY = "yae,yoimiya"           # 可选，只出这几个主题
+go test ./internal/view -run TestWriteShots -timeout 1800s
+```
+
+每个主题出三张：整屏、纯壁纸（t=0 / t=6）、带压暗与粒子的完整壁纸（t=0 / t=6）。
 
 ## 路线图
 
-1. **发布 v0.1.1**：打 `v0.1.1` tag，发布全屏开场修复版，并验证 0.1.0 → 0.1.1
-   的「检查 → 下载 → 安装 → 重启」链路
+1. **发布 v0.1.2**：动态壁纸补全（六个角色的动效 + 八重/宵宫人物），打 tag 后走 Actions
 2. **可选**：标识/开场的 3D 材质网格、最小化退场动画、更多分镜细节
 3. 壁纸页保持现状；黑白基础主题不做
 
 ## 说明
 
 - 角色名称与相关视觉元素归原版权方所有，本项目仅作技术学习与本地演示，不用于商业分发。
-- 资产（壁纸、序列帧）不进入版本库，放在 `assets/`（已 gitignore），由本地脚本从原项目导入。
+- 壁纸素材来自原项目，派生资源（人物合成图与三层遮罩）由 `scripts/assetgen` 生成后随仓库提交；
+  `.hbc/.hbw` 容器不随仓库分发。
