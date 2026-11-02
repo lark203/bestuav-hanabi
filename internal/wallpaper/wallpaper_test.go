@@ -9,11 +9,33 @@ import (
 	"bestuav-hanabi/internal/assets"
 )
 
-// 测试用的画布尺寸：16:9，与素材（bg 3840×2160 / flow-mask 960×540）同比例，
-// 这样 Cover 不做裁切，屏幕坐标与遮罩坐标一一对应。
+// 测试用的画布尺寸：16:9，与素材（bg 3840×2160 / flow-mask 960×540 / wave-a,b
+// 1920×1080）同比例，这样 Cover 不做裁切，屏幕坐标与遮罩坐标一一对应。
 const (
 	testW, testH = 320, 180
 )
+
+// testStrength 是测试里用的位移强度，比 theme 里配的真实值（0.003）大一个量级。
+//
+// 原因：320 宽的测试画布上，0.003 只对应不到 1 像素，逐像素比色根本测不出来。
+// 放大后位移场形状、遮罩边界这些**我们要验证的性质**完全不变——只是把信噪比
+// 拉起来。观感参数由 theme 决定，不由这里决定。
+const testStrength = 0.02
+
+// testFlow 构造测试用的三层流动素材（与甘雨主题同源）。缺素材返回 nil。
+func testFlow(t *testing.T) *Flow {
+	t.Helper()
+	mask := assets.Bitmap("ganyu/ganyu-flow-mask.png")
+	waveA := assets.Bitmap("ganyu/ganyu-wave-a.png")
+	waveB := assets.Bitmap("ganyu/ganyu-wave-b.png")
+	if mask == nil || waveA == nil || waveB == nil {
+		return nil
+	}
+	return &Flow{
+		Mask: mask, WaveA: waveA, WaveB: waveB,
+		Dir: ui.Point{X: 0.94, Y: -0.34}, Strength: testStrength,
+	}
+}
 
 // render 用指定时钟与强度渲染一小块壁纸（尺寸小是为了让 CPU 解释器跑得快）。
 func render(t *testing.T, bg *ui.Bitmap, flow *Flow, time float64, play float32) *image.RGBA {
@@ -60,11 +82,10 @@ func diff(x, y *image.RGBA) int {
 // TestAnimation 钉住三条性质：着色器能编译并出图、时间推进会改变画面、play=0 时静止。
 func TestAnimation(t *testing.T) {
 	bg := assets.Bitmap("ganyu/bg.jpg")
-	mask := assets.Bitmap("ganyu/ganyu-flow-mask.png")
-	if bg == nil || mask == nil {
+	flow := testFlow(t)
+	if bg == nil || flow == nil {
 		t.Skip("assets/ganyu 未导入（素材不入库），跳过")
 	}
-	flow := &Flow{Mask: mask, Dir: ui.Point{X: 0.94, Y: -0.34}, Strength: 0.012}
 
 	early := render(t, bg, flow, 0, 1)
 	late := render(t, bg, flow, 8, 1)
@@ -84,14 +105,13 @@ func TestAnimation(t *testing.T) {
 // 曾经的做法是叠第二张人物图并让它相对背景漂移，于是整幅画面都在动、
 // 看得出"两个人"。这里用像素证明：只有上半部发区在动，下半部一个点都没动。
 //
-// flow-mask 实测覆盖 x 31%~82% / y 0%~42%（峰值在 y 17%~33%），下半张全 0。
+// flow-mask 实测覆盖 x 31.5%~81.6% / y 0%~42%，下半张全 0。
 func TestFlowStaysInsideMask(t *testing.T) {
 	bg := assets.Bitmap("ganyu/bg.jpg")
-	mask := assets.Bitmap("ganyu/ganyu-flow-mask.png")
-	if bg == nil || mask == nil {
+	flow := testFlow(t)
+	if bg == nil || flow == nil {
 		t.Skip("assets/ganyu 未导入（素材不入库），跳过")
 	}
-	flow := &Flow{Mask: mask, Dir: ui.Point{X: 0.94, Y: -0.34}, Strength: 0.012}
 
 	a := render(t, bg, flow, 0, 1)
 	b := render(t, bg, flow, 3.7, 1)
@@ -116,10 +136,58 @@ func TestFlowStaysInsideMask(t *testing.T) {
 	if maxY >= testH/2 {
 		t.Errorf("形变越过了画面中线：最靠下的动点 y=%d（中线 %d），主体被带着动了", maxY, testH/2)
 	}
-	// 左右边界也要落在遮罩 bbox（31%~82%）的附近，留 5% 容差给遮罩软化和位移。
+	// 三层遮罩的并集是 flow-mask（x 31.5%~81.6%），留 5% 容差给滤波与位移。
 	lo, hi := testW*26/100, testW*87/100
 	if minX < lo || maxX > hi {
 		t.Errorf("形变横向越界：x %d..%d，遮罩区应在 %d..%d（含 5%% 容差）", minX, maxX, lo, hi)
 	}
 	t.Logf("动点 %d 个，范围 x %d..%d / y %d..%d（画布 %dx%d）", moved, minX, maxX, minY, maxY, testW, testH)
+}
+
+// TestWaveLayersAddDetail 验证"一缕一缕分层次"确实生效。
+//
+// 做法：同一时刻分别渲染「三层全开」与「只有基础层」，逐点比差异。
+// 细缕层只在各自遮罩内贡献位移，所以差异应当**只出现在细缕遮罩的范围内**：
+//   - wave-a 实测 bbox x 46.6%~59.2% / y 26.5%~42.7%
+//   - wave-b 实测 bbox x 50.3%~59.7% / y 0%~20.3%
+// 若细缕层没生效，两者会完全一样（差异 0）；若细缕层漏到大范围，差异会溢出 bbox。
+func TestWaveLayersAddDetail(t *testing.T) {
+	bg := assets.Bitmap("ganyu/bg.jpg")
+	flow := testFlow(t)
+	if bg == nil || flow == nil {
+		t.Skip("assets/ganyu 未导入（素材不入库），跳过")
+	}
+
+	// 只留基础层：细缕层置 nil，着色器把空槽读为透明。
+	baseOnly := &Flow{Mask: flow.Mask, Dir: flow.Dir, Strength: flow.Strength}
+
+	full := render(t, bg, flow, 2.1, 1)
+	base := render(t, bg, baseOnly, 2.1, 1)
+
+	// 两处细缕 bbox 的并集，换算到测试画布，留 8% 容差给滤波与位移。
+	loX, hiX := testW*40/100, testW*67/100
+	loY, hiY := 0, testH*50/100
+
+	inside, outside := 0, 0
+	for y := 0; y < testH; y++ {
+		for x := 0; x < testW; x++ {
+			if delta(full, base, x, y) <= 6 {
+				continue
+			}
+			if x >= loX && x <= hiX && y >= loY && y <= hiY {
+				inside++
+			} else {
+				outside++
+			}
+		}
+	}
+
+	if inside < 30 {
+		t.Fatalf("细缕层几乎没贡献位移（bbox 内仅 %d 点差异），分层可能没生效", inside)
+	}
+	// 细缕层的影响必须留在细缕 bbox 附近；漏出去说明遮罩没起作用。
+	if outside > inside/3 {
+		t.Errorf("细缕层影响溢出 bbox：内部 %d 点、外部 %d 点，遮罩可能未生效", inside, outside)
+	}
+	t.Logf("细缕层贡献：bbox 内 %d 点差异，bbox 外 %d 点", inside, outside)
 }

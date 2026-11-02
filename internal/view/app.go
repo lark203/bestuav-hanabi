@@ -59,6 +59,7 @@ func NewApp() *App {
 // wallpaperFlow 构造当前主题的局部流动素材；仅带流动图层的角色（甘雨）返回非空。
 //
 // 遮罩走 assets 缓存（缺图返回 nil，壁纸退化为静态，不会报错）。
+// 细缕层缺图时留 nil，着色器把空槽读为透明，该层自动不参与。
 func (a *App) wallpaperFlow() *wallpaper.Flow {
 	if a.char.FlowMask == "" {
 		return nil
@@ -67,7 +68,14 @@ func (a *App) wallpaperFlow() *wallpaper.Flow {
 	if mask == nil {
 		return nil
 	}
-	return &wallpaper.Flow{Mask: mask, Dir: a.char.FlowDir, Strength: a.char.FlowStrength}
+	f := &wallpaper.Flow{Mask: mask, Dir: a.char.FlowDir, Strength: a.char.FlowStrength}
+	if a.char.FlowWaveA != "" {
+		f.WaveA = assets.Bitmap(a.char.FlowWaveA)
+	}
+	if a.char.FlowWaveB != "" {
+		f.WaveB = assets.Bitmap(a.char.FlowWaveB)
+	}
+	return f
 }
 
 // setCharacter 切换角色主题：令牌与标识画法一起换，界面下一帧即生效。
@@ -80,8 +88,10 @@ func (a *App) setCharacter(id string) {
 	a.tok = c.Tok
 	// 释放上一套的壁纸/头像/流动遮罩像素：每张 4K 约 33MB，六套全留着会到 200MB。
 	keep := []string{c.Bg, c.Icon}
-	if c.FlowMask != "" {
-		keep = append(keep, c.FlowMask)
+	for _, p := range []string{c.FlowMask, c.FlowWaveA, c.FlowWaveB} {
+		if p != "" {
+			keep = append(keep, p)
+		}
 	}
 	assets.Keep(keep...)
 }

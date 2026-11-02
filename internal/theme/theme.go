@@ -150,17 +150,29 @@ type Character struct {
 	// Icon 是头像的相对路径；空表示没有头像素材，界面用元素色圆点占位。
 	Icon string
 
-	// FlowMask 是壁纸局部流动的区域权重遮罩路径（灰度，非零处才形变）。
+	// FlowMask 是壁纸局部流动的**基础层**遮罩（灰度，非零处才形变），覆盖整片
+	// 该动的区域。必须与 Bg 同源、构图对齐。
 	//
-	// 必须与 Bg 同源、构图对齐——遮罩决定"哪里动"。甘雨的 flow-mask 只覆盖
-	// 头部发区（实测非零 9.5%，bbox x 31%~82% / y 0%~42%，下半张全 0），
-	// 所以看起来只有发型在飘，人物主体不动。
+	// 甘雨的 flow-mask 只覆盖头部发区（实测非零 9.51%，bbox x 31.5%~81.6% /
+	// y 0%~42%，下半张全 0），所以人物主体不动。
 	//
 	// 空表示该角色没有流动素材：着色器按 FlowStrength=0 跳过，其余主题不受影响。
 	FlowMask string
-	// FlowStrength 是形变的最大位移，单位是图片 UV（0.01 = 图宽的 1%）。
+	// FlowWaveA / FlowWaveB 是**细缕层**遮罩（可选），覆盖基础层内的一小片。
+	//
+	// 分层次就是靠这个：三层遮罩范围不同、相位与方向各偏开一点，累加后细缕处
+	// 比周围多一份位移，看起来才是一缕一缕分开飘，而不是整片一起晃。
+	// 甘雨实测 wave-a 覆盖下侧一缕（1.08%，bbox x 46.6~59.2% / y 26.5~42.7%）、
+	// wave-b 覆盖顶部一缕（1.57%，bbox x 50.3~59.7% / y 0~20.3%）。
+	FlowWaveA string
+	FlowWaveB string
+	// FlowStrength 是基础层的最大位移，单位是图片 UV（0.01 = 图宽的 1%）。
+	// 细缕层在着色器里乘 1.25~1.35（覆盖面积小，要略大才看得出来）。
+	//
+	// 取值经验：0.002~0.004 是"轻微呼吸"，0.01 以上会被看成整幅画面在晃。
 	FlowStrength float32
 	// FlowDir 是形变主方向（单位向量，y 向下）；零值按水平向右处理。
+	// 细缕层会在 ±22° 上各自偏开，所以这里只需给一个大致朝向。
 	//
 	// 方向不做成逐像素：原项目 flow-rg 实测 95% 像素是中性色、仅约 5% 有方向，
 	// 当方向场用只会零星抖动；参考项目同样把方向放在每层配置里。
@@ -213,11 +225,17 @@ var all = []Character{
 		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
 		CardBg: ui.Hex("#14314A"), Art: ArtBlossom,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
-		// 甘雨专属局部流动：发区遮罩（原项目预烘焙图层）。遮罩只覆盖头部发区，
-		// 形变后仍采样同一张背景，所以是"只有发型在飘"，不是整幅平移。
-		// 方向取右上（发丝自然的飘向），幅度 1.2% 图宽。
-		FlowMask: "ganyu/ganyu-flow-mask.png", FlowStrength: 0.012,
-		FlowDir: ui.Point{X: 0.94, Y: -0.34},
+		// 甘雨专属局部流动：整片发区 + 下侧/顶部两缕细层（原项目预烘焙图层）。
+		// 三层遮罩范围不同、相位方向各偏开，得到"一缕一缕分开飘"。
+		// 形变后仍采样同一张背景，所以不是整幅平移。
+		//
+		// 幅度 0.003 = 基础层约 11px（4K 图宽 1% 的 1/3）：只是轻微浮动，
+		// 细缕层在着色器里乘 1.35，约 15px，会比周围明显一点——这正是分层感。
+		// 之前 0.012（约 46px）被判定"整体飘动幅度太大"，已下调到 1/4。
+		FlowMask: "ganyu/ganyu-flow-mask.png",
+		FlowWaveA: "ganyu/ganyu-wave-a.png", FlowWaveB: "ganyu/ganyu-wave-b.png",
+		FlowStrength: 0.003,
+		FlowDir:      ui.Point{X: 0.94, Y: -0.34},
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
