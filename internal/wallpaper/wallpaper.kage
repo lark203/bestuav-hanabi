@@ -1,20 +1,23 @@
 package main
 
-// 壁纸：一张静态插画，靠随时间缓慢漂移的 UV 把它"吹活"，
-// 并按当前角色的元素色做保亮度染色——同一张壁纸在不同主题下读出不同氛围。
+// 壁纸：一张静态插画，靠随时间缓慢漂移的 UV 把它"吹活"，并按主题染色。
 //
 // 原项目用 flow-rg 方向场 + wave/phase 三张图驱动，这里先用两层不同频率、
 // 不同相位的正弦叠加——视觉上同样是"低频、连续、无重复感"的流动，
-// 但省掉三张 1920×1080 的采样，CPU 渲染器也扛得住。
+// 但省掉三张 1920×1080 的采样，CPU 渲染器也能实时跑。
 //
-// 位移幅度按图片空间计（不是屏幕空间），所以窗口大小变化时观感一致；
-// 画面下部（近景）权重更大，形成一点景深错觉。
+// 甘雨等带 Overlay 的主题会再叠一层装饰图（孔明灯 / 清心花纹）：该层相对背景
+// 做更轻、不同相位的反向漂动，像灯笼在夜色里摇曳——而不是和背景一起平移。
+// OverlayStrength = 0（或 image1 未绑定，mygo 读为透明）时整段不生效，
+// 其余主题（不传 overlay）完全不受影响。
 
 var Time float // 秒，动效时钟
 var Play float // 0..1，动效强度；0 = 完全静止（截图对比与低功耗场景用）
 
 var Tint vec3        // 目标色调（元素色，0..1）
 var TintAmount float // 0 = 原色，1 = 完全染色
+
+var OverlayStrength float // 0 = 不叠加装饰层；>0 时 image1（颜色）/image2（遮罩）参与合成
 
 func Fragment(dst vec4, pos vec2) vec4 {
 	size := rectSize()
@@ -44,6 +47,26 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	tintLuma := max(dot(Tint, vec3(0.299, 0.587, 0.114)), 0.06)
 	tinted := Tint * (luma / tintLuma)
 	c = vec4(mix(c.rgb, tinted, TintAmount), c.a)
+
+	// 甘雨等主题的装饰叠层：孔明灯 / 清心花纹。相对背景做更轻的反向漂动，
+	// 制造层间错位的呼吸感；遮罩（image2）决定哪里透出、哪里不显。
+	if OverlayStrength > 0.001 {
+		oimg := image1Size()
+		os := max(size.x/oimg.x, size.y/oimg.y)
+		ooff := (size - oimg*os) * 0.5
+		ouv := (pos - ooff) / os / oimg
+
+		// 与背景不同的频率与相位，幅度更小——层与层错位而不是整体平移。
+		ow := sin(ouv.x*3.0 - ouv.y*2.0 + Time*0.09)
+		oamp := (0.0012 + 0.0020*ouv.y) * Play
+		ouv = ouv + vec2(ow, ow*0.6) * oamp
+
+		oc := image1Sample(ouv * oimg)
+		// image2 是透明度遮罩（红通道）：未绑定时 mygo 读为透明，ma = 0，叠层自动不显。
+		ma := image2Sample(ouv * oimg).r
+		a := ma * OverlayStrength
+		c = vec4(mix(c.rgb, oc.rgb, a), c.a)
+	}
 
 	return c
 }

@@ -32,6 +32,13 @@ func TestCharacters(t *testing.T) {
 		if c.WallTint < 0 || c.WallTint > 1 {
 			t.Errorf("%s 的 WallTint 越界：%.2f", c.ID, c.WallTint)
 		}
+		if c.OverlayStrength < 0 || c.OverlayStrength > 1 {
+			t.Errorf("%s 的 OverlayStrength 越界：%.2f", c.ID, c.OverlayStrength)
+		}
+		// Overlay 与遮罩必须成对：有颜色层就该有遮罩，避免叠层静默不显。
+		if c.Overlay != "" && c.OverlayMask == "" {
+			t.Errorf("%s 有 Overlay 但缺 OverlayMask", c.ID)
+		}
 		motifs[c.Motif] = true
 	}
 

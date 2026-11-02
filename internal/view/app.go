@@ -56,6 +56,24 @@ func NewApp() *App {
 	return &App{char: c, tok: c.Tok, page: "library", t0: time.Now(), animPlay: 1, filter: -1}
 }
 
+// wallpaperOverlay 构造当前主题的装饰叠层；仅甘雨等带 Overlay 的角色返回非空。
+//
+// 叠层的颜色图与遮罩图同样走 assets 缓存（缺图返回 nil，壁纸退化为无叠层）。
+func (a *App) wallpaperOverlay() *wallpaper.Overlay {
+	if a.char.Overlay == "" {
+		return nil
+	}
+	img := assets.Bitmap(a.char.Overlay)
+	if img == nil {
+		return nil
+	}
+	o := &wallpaper.Overlay{Image: img, Strength: a.char.OverlayStrength}
+	if a.char.OverlayMask != "" {
+		o.Mask = assets.Bitmap(a.char.OverlayMask)
+	}
+	return o
+}
+
 // setCharacter 切换角色主题：令牌与标识画法一起换，界面下一帧即生效。
 func (a *App) setCharacter(id string) {
 	c, ok := theme.ByID(id)
@@ -64,8 +82,15 @@ func (a *App) setCharacter(id string) {
 	}
 	a.char = c
 	a.tok = c.Tok
-	// 释放上一套的壁纸/头像像素：每张 4K 约 33MB，六套全留着会到 200MB。
-	assets.Keep(c.Bg, c.Icon)
+	// 释放上一套的壁纸/头像/叠层像素：每张 4K 约 33MB，六套全留着会到 200MB。
+	keep := []string{c.Bg, c.Icon}
+	if c.Overlay != "" {
+		keep = append(keep, c.Overlay)
+		if c.OverlayMask != "" {
+			keep = append(keep, c.OverlayMask)
+		}
+	}
+	assets.Keep(keep...)
 }
 
 // SetWindow 由 main 注入窗口句柄。
@@ -93,11 +118,13 @@ func (a *App) View(c *ui.Context) {
 	// 所以 UI 天然压在壁纸上，不需要额外的层叠容器。
 	root := ui.Column(c).Fill().Background(a.tok.WinFill)
 	if bg := assets.Bitmap(a.char.Bg); bg != nil {
+		ov := a.wallpaperOverlay()
 		root = root.Draw(func(p *ui.Painter, r ui.Rect) {
 			// 用帧时间而不是 time.Now()：重绘帧不重建 view，时间也来自同一个时钟。
 			elapsed := p.Now().Sub(a.t0).Seconds()
-			// 着色器驱动：Cover 铺满 + 缓慢流动 + 按角色元素色保亮度染色。
-			wallpaper.Draw(p, bg, r, elapsed, a.animPlay, a.tok.Accent, a.char.WallTint)
+			// 着色器驱动：Cover 铺满 + 缓慢流动 + 按角色元素色保亮度染色；
+			// 甘雨等带 Overlay 的主题会再叠一层孔明灯 / 清心花纹（相对背景轻漂）。
+			wallpaper.Draw(p, bg, r, elapsed, a.animPlay, a.tok.Accent, a.char.WallTint, ov)
 			p.Fill(r, ui.RGBA(6, 12, 22, a.char.Scrim), 0) // 按壁纸亮度压暗（见 Character.Scrim）
 
 			// 顶部再压一层渐变，托住标题区（在玻璃条之下，不影响玻璃本身的通透）。
@@ -239,7 +266,7 @@ func (a *App) titlebar(c *ui.Context) {
 			if a.win != nil {
 				a.win.Minimize()
 			}
-		})
+		}, false)
 		a.winButton(c, icons.Maximize, "最大化 / 还原", func() {
 			if a.win == nil {
 				return
@@ -249,12 +276,12 @@ func (a *App) titlebar(c *ui.Context) {
 			} else {
 				a.win.Maximize()
 			}
-		})
+		}, false)
 		a.winButton(c, icons.Close, "关闭", func() {
 			if a.win != nil {
 				a.win.Close()
 			}
-		})
+		}, true)
 	})
 	bar.DragWindow()
 
@@ -269,20 +296,34 @@ func (a *App) titlebar(c *ui.Context) {
 
 // winButton 是一个窗口控件按钮：悬停变亮，点击执行 action。
 //
+// warn=true 时（仅关闭按钮）走"警告色"分支：悬停染成主题警告红玫色，
+// 图标也转成同色——与最小化/最大化区分开，提醒这是破坏性操作。
+// 参考项目 HanaBi-ui-Genshin 正是给关闭按钮（index 2）单独染玫红。
+//
 // 图标用 SVG 而不是 "—" "□" "✕" 这些字符：字体里不一定有这些字形，
 // 缺字形时按钮会变成一个空方块（试过）。
-func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func()) {
+func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func(), warn bool) {
 	btn := ui.Row(c).Width(32).Height(26).Radius(6).
 		AlignItems(ui.Center).Justify(ui.Center)
-	if btn.Hovered() {
-		btn.Background(ui.RGBA(255, 255, 255, 0.16))
+	hovered := btn.Hovered()
+	if hovered {
+		if warn {
+			// 警告色提醒：破坏性操作，悬停时背景与图标都染成主题警告红。
+			btn.Background(a.tok.Danger.Alpha(0.22))
+		} else {
+			btn.Background(ui.RGBA(255, 255, 255, 0.16))
+		}
 	}
 	btn.Tooltip(tip)
 	if btn.Clicked() {
 		action()
 	}
 	btn.Children(func() {
-		ui.Icon(c, icon).FontSize(16).TextColor(a.tok.Text)
+		col := a.tok.Text
+		if warn && hovered {
+			col = a.tok.Danger
+		}
+		ui.Icon(c, icon).FontSize(16).TextColor(col)
 	})
 }
 

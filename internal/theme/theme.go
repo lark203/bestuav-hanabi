@@ -119,6 +119,7 @@ type Tokens struct {
 	Accent     ui.Color // 强调色（元素色）
 	AccentSoft ui.Color // 强调色的低透明底
 	Good       ui.Color // 正向状态
+	Danger     ui.Color // 破坏性操作的提示色（关闭按钮等），暖红玫色
 
 	Radius float32 // 全局圆角
 }
@@ -149,6 +150,15 @@ type Character struct {
 	// Icon 是头像的相对路径；空表示没有头像素材，界面用元素色圆点占位。
 	Icon string
 
+	// Overlay 是叠在壁纸之上的装饰层路径（如甘雨的孔明灯 / 清心花纹），
+	// 空表示无叠层——着色器按 OverlayStrength=0 跳过，其余主题完全不受影响。
+	// 仅甘雨等带预处理图层的角色有；素材来自原项目 assets/tex 的同名文件。
+	Overlay string
+	// OverlayMask 是装饰层的透明度遮罩路径（与 Overlay 配套；空表示该层不带遮罩）。
+	OverlayMask string
+	// OverlayStrength 是叠层的合成强度 0..1（仅 Overlay 非空时生效）。
+	OverlayStrength float32
+
 	// WallTint 是壁纸染色的强度 0..1：0 = 保持原图颜色。
 	// 各自的壁纸色调已经贴合角色，这里只做轻微统一，通常 0.1~0.2。
 	WallTint float32
@@ -178,7 +188,10 @@ func derive(accent ui.Color) Tokens {
 		Accent:     accent,
 		AccentSoft: accent.Alpha(0.14),
 		Good:       ui.Hex("#7BE0B0"),
-		Radius:     12,
+		// 警告红玫色：在冷（甘雨）暖（宵宫）各主题上都能跳出来；
+		// 参考项目给关闭按钮单独染玫红 (223,140,159)，这里取稍饱和一点的暖红。
+		Danger: ui.Hex("#FF6B7A"),
+		Radius: 12,
 	}
 }
 
@@ -193,6 +206,10 @@ var all = []Character{
 		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
 		CardBg: ui.Hex("#14314A"), Art: ArtBlossom,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
+		// 甘雨专属装饰叠层：孔明灯 / 清心花纹。颜色层 + 透明度遮罩来自原项目，
+		// 相对背景做更轻的反向漂动（见 wallpaper.kage 的 OverlayStrength 分支）。
+		Overlay: "ganyu/ganyu-overlay.jpg", OverlayMask: "ganyu/ganyu-overlay-alpha.png",
+		OverlayStrength: 0.9,
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
