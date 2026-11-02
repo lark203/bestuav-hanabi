@@ -2,6 +2,11 @@
 //
 // 每帧都会请求同一张图，所以解码结果必须缓存：1200 万像素的 JPG 每帧解码
 // 会直接把帧率打到个位数。加载失败返回 nil，界面自动降级为纯色背景。
+//
+// 内存：原始素材是 4K（3840×2160，解码成 RGBA 就是 33MB 一张），但窗口通常
+// 1280~1920 宽，4K 纹理只是白占内存——切换主题时新旧两张同时驻留，峰值会很高。
+// 这里统一**解码时就降到 maxWidth 宽**：壁纸 1920（8.3MB），遮罩本来就只有
+// 960 宽（生成脚本的 MASK_W，2MB 一张），一个主题的常驻约 14MB。
 package assets
 
 import (
@@ -20,6 +25,12 @@ import (
 
 // root 是资源子目录名（相对项目根 / 应用资源目录）。
 const root = "assets"
+
+// maxWidth 是解码后的最大宽度。
+//
+// 1920 是权衡：1280 窗口下是 1.5 倍超采样，1920 窗口正好 1:1；再大的窗口会略软，
+// 换来的是每张壁纸从 33MB 降到 8.3MB。遮罩只有 960 宽，不会触发缩放。
+const maxWidth = 1920
 
 // assetsDir 定位资源根目录。
 //
@@ -63,9 +74,6 @@ func findAssetsDir() string {
 var (
 	mu    sync.Mutex
 	cache = map[string]*ui.Bitmap{}
-	// thumbs 单独一张缓存：缩略图体积小（每张几百 KB），可以长期留着，
-	// 主题库要同时显示七个角色，不能为此解码七张 4K 原图。
-	thumbs = map[string]*ui.Bitmap{}
 )
 
 // Bitmap 返回 assets/<rel> 解码后的位图，失败返回 nil（并记住失败，不重试）。
@@ -76,59 +84,33 @@ func Bitmap(rel string) *ui.Bitmap {
 	if bmp, ok := cache[rel]; ok {
 		return bmp
 	}
-
 	data, err := os.ReadFile(filepath.Join(assetsDir, rel))
 	if err != nil {
 		cache[rel] = nil
 		return nil
 	}
-	bmp, err := ui.DecodeBitmap(data)
+	img, err := decodeScaled(data, maxWidth)
 	if err != nil {
 		cache[rel] = nil
 		return nil
 	}
+	// 用 NewBitmap 而不是 DecodeBitmap：后者会把压缩数据和"重新解码"的闭包
+	// 一起留着，切换主题时既多占内存，又会在 ReleasePixels 之后反复解码。
+	bmp := ui.NewBitmap(img)
 	cache[rel] = bmp
 	return bmp
 }
 
-// Thumb 返回 assets/<rel> 的缩略图（宽度至多 maxW），失败返回 nil。
+// Keep 只保留仍需要的位图，其余移出缓存。
 //
-// 自己解码再降采样，而不是先 Bitmap 再缩放：缩略图只需要小尺寸，
-// 没必要为此把 4K 图整张解码进内存。
-func Thumb(rel string, maxW int) *ui.Bitmap {
-	mu.Lock()
-	defer mu.Unlock()
-
-	key := rel + "@" + itoa(maxW)
-	if b, ok := thumbs[key]; ok {
-		return b
-	}
-
-	data, err := os.ReadFile(filepath.Join(assetsDir, rel))
-	if err != nil {
-		thumbs[key] = nil
-		return nil
-	}
-	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		thumbs[key] = nil
-		return nil
-	}
-	b := ui.NewBitmap(scaleDown(img, maxW))
-	thumbs[key] = b
-	return b
-}
-
-// Keep 只保留仍需要的位图，其余的释放像素并移出缓存。
-//
-// 一张 4K 壁纸解码后约 33 MB（3840×2160×4）。七个角色的壁纸全留在缓存里
-// 就是 200 MB 起——切换主题时必须清掉不用的。保留原始文件数据的话
-// （DecodeBitmap 的语义），切回来会重新解码，代价可接受。
+// 一个主题的壁纸 + 三层遮罩约 14MB；七个角色全留着就是 100MB 起，切换主题时
+// 必须清掉不用的。位图用 NewBitmap 创建（像素在本进程里），移出缓存后由 GC
+// 回收；切回来会重新解码，代价可以接受。
 func Keep(keys ...string) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	for rel, bmp := range cache {
+	for rel := range cache {
 		wanted := false
 		for _, k := range keys {
 			if k == rel {
@@ -139,75 +121,92 @@ func Keep(keys ...string) {
 		if wanted {
 			continue
 		}
-		if bmp != nil {
-			bmp.ReleasePixels()
-		}
 		delete(cache, rel)
 	}
 }
 
-// scaleDown 用盒式平均把图缩到宽度 maxW（保持比例）。
+// decodeScaled 解码图片并把宽度压到 maxW 以内（等比）。宽度已经够小就原样返回。
 //
-// 只用在一处：主题库缩略图。降采样的质量在这里够用，也不想为此引入依赖。
-// image.RGBA 是预乘 alpha，At() 给出的也是预乘值，逐通道平均后写回即可。
-func scaleDown(src image.Image, maxW int) *image.RGBA {
-	b := src.Bounds()
-	sw, sh := b.Dx(), b.Dy()
-	if sw == 0 || sh == 0 {
-		return image.NewRGBA(image.Rect(0, 0, 1, 1))
+// 为什么不用 x/image/draw 的 CatmullRom：它对非 RGBA 源（JPEG 解出来是 YCbCr）
+// 走通用路径，会额外分配两张 float32 的中间图——一张 4K 图缩到 1920 峰值要
+// 139MB 垃圾，切几次主题进程就涨到几百 MB。这里自己按面积平均，只分配目标图。
+func decodeScaled(data []byte, maxW int) (image.Image, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
 	}
-	if maxW > sw {
-		maxW = sw
+	b := img.Bounds()
+	sw, sh := b.Dx(), b.Dy()
+	if sw <= maxW || maxW <= 0 {
+		return img, nil
 	}
 	w := maxW
-	h := sh * w / sw
+	h := sh * maxW / sw
 	if h < 1 {
 		h = 1
 	}
+	return downscale(img, w, h), nil
+}
 
+// downscale 把 src 按面积平均缩到 w×h，只分配目标图。
+//
+// 绝大多数素材是 4:2:0 的 JPEG 且恰好缩一半，走 fast2x420（4 个 Y + 1 个 Cb/Cr，
+// 不经过接口调用）；其它比例（比如钟离的 2559 宽）走通用面积平均。
+func downscale(src image.Image, w, h int) *image.RGBA {
 	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := 0; y < h; y++ {
-		y0 := b.Min.Y + y*sh/h
-		y1 := b.Min.Y + (y+1)*sh/h
+	b := src.Bounds()
+	sw, sh := b.Dx(), b.Dy()
+	if y, ok := src.(*image.YCbCr); ok && sw == 2*w && sh == 2*h &&
+		y.SubsampleRatio == image.YCbCrSubsampleRatio420 {
+		fast2x420(y, dst)
+		return dst
+	}
+	for dy := 0; dy < h; dy++ {
+		y0 := b.Min.Y + dy*sh/h
+		y1 := b.Min.Y + (dy+1)*sh/h
 		if y1 <= y0 {
 			y1 = y0 + 1
 		}
-		for x := 0; x < w; x++ {
-			x0 := b.Min.X + x*sw/w
-			x1 := b.Min.X + (x+1)*sw/w
+		for dx := 0; dx < w; dx++ {
+			x0 := b.Min.X + dx*sw/w
+			x1 := b.Min.X + (dx+1)*sw/w
 			if x1 <= x0 {
 				x1 = x0 + 1
 			}
-			var sr, sg, sb, sa, n uint64
+			var r, g, bl, a, n uint32
 			for yy := y0; yy < y1; yy++ {
 				for xx := x0; xx < x1; xx++ {
-					r, g, bl, a := src.At(xx, yy).RGBA()
-					sr, sg, sb, sa = sr+uint64(r), sg+uint64(g), sb+uint64(bl), sa+uint64(a)
+					cr, cg, cb, ca := src.At(xx, yy).RGBA()
+					r, g, bl, a = r+cr, g+cg, bl+cb, a+ca
 					n++
 				}
 			}
-			if n == 0 {
-				continue
-			}
-			dst.SetRGBA(x, y, color.RGBA{
-				R: uint8(sr / n >> 8), G: uint8(sg / n >> 8),
-				B: uint8(sb / n >> 8), A: uint8(sa / n >> 8),
+			dst.SetRGBA(dx, dy, color.RGBA{
+				R: uint8(r / n >> 8), G: uint8(g / n >> 8),
+				B: uint8(bl / n >> 8), A: uint8(a / n >> 8),
 			})
 		}
 	}
 	return dst
 }
 
-func itoa(v int) string {
-	if v == 0 {
-		return "0"
+// fast2x420 是 4:2:0 YCbCr 恰好缩小一半的专用路径：
+// 每个目标像素取 2×2 的 Y 求平均、共享同一个 Cb/Cr。
+func fast2x420(src *image.YCbCr, dst *image.RGBA) {
+	b := src.Bounds()
+	w, h := dst.Rect.Dx(), dst.Rect.Dy()
+	for dy := 0; dy < h; dy++ {
+		y0 := b.Min.Y + 2*dy
+		row := dst.Pix[dy*dst.Stride:]
+		for dx := 0; dx < w; dx++ {
+			x := b.Min.X + 2*dx
+			yy := (uint32(src.Y[src.YOffset(x, y0)]) +
+				uint32(src.Y[src.YOffset(x+1, y0)]) +
+				uint32(src.Y[src.YOffset(x, y0+1)]) +
+				uint32(src.Y[src.YOffset(x+1, y0+1)]) + 2) / 4
+			ci := src.COffset(x, y0)
+			r, g, bl := color.YCbCrToRGB(uint8(yy), src.Cb[ci], src.Cr[ci])
+			row[4*dx], row[4*dx+1], row[4*dx+2], row[4*dx+3] = r, g, bl, 255
+		}
 	}
-	var b [8]byte
-	i := len(b)
-	for v > 0 {
-		i--
-		b[i] = byte('0' + v%10)
-		v /= 10
-	}
-	return string(b[i:])
 }

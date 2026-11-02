@@ -5,6 +5,8 @@
 package main
 
 import (
+	"runtime/debug"
+
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
@@ -13,6 +15,12 @@ import (
 )
 
 func main() {
+	// 壁纸解码/缩放是几十 MB 的短命分配：默认 GOGC=100 会先把堆翻倍再回收，
+	// 切几次主题进程就涨到几百 MB。50 让 GC 早一点介入；再加一个软上限兜底，
+	// 防止异常增长时把内存吃满（超过上限只会更勤快地 GC，不会直接失败）。
+	debug.SetGCPercent(50)
+	debug.SetMemoryLimit(384 << 20)
+
 	mygo.App.WhenReady(func() {
 		// 先读用户设置：启动主题、字号、动效开关都在这里恢复。
 		a := view.NewAppWithSettings(settings.Load())

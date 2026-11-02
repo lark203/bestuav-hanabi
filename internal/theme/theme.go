@@ -296,10 +296,12 @@ type Character struct {
 	// 各自的壁纸色调已经贴合角色，这里只做轻微统一，通常 0.1~0.2。
 	WallTint float32
 
-	// Scrim 是壁纸上的压暗强度 0..1，保证白字压在上面仍可读。
+	// Scrim 是壁纸上的压暗强度 0..1。
 	//
-	// 不能所有角色用同一个值：实测平均亮度从甘雨的 0.27 到八重/纳西妲的 0.80，
-	// 同一个 0.38 对前者刚好、对后者等于没压。取值按 0.32+max(0,luma-0.32)×0.55 换算。
+	// 参考项目默认的 dim 只有约 0.12（`(1-.82)*.65`），这里之前给到 0.32~0.66，
+	// 壁纸只剩三四成亮度、整体比原版暗一大截。现在压到 0.14~0.22：
+	// 壁纸保留八成以上亮度，文字可读性交给半透明面板与顶部渐变，而不是整屏压暗。
+	// 亮的壁纸（纳西妲 0.80、钟离 0.69）仍略高一点，暗的（甘雨 0.27、芙宁娜 0.36）更低。
 	Scrim float32
 }
 
@@ -309,8 +311,8 @@ func derive(accent ui.Color) Tokens {
 	return Tokens{
 		WinFill:    deep.Alpha(0.58),
 		WinStroke:  accent.Alpha(0.20),
-		Sidebar:    deep.Alpha(0.44),
-		Card:       accent.Alpha(0.10),
+		Sidebar:    deep.Alpha(0.56),
+		Card:       accent.Alpha(0.13),
 		CardStroke: accent.Alpha(0.22),
 
 		// 文字都掺一点元素色：整块界面会带角色气质，而不是纯灰白。
@@ -338,7 +340,7 @@ var all = []Character{
 		Motto: "循霜而行", Constellation: "S I N U S   U N I C O R N I S",
 		Scene: "璃月 · 海灯夜", SceneEN: "A QUIET MOMENT",
 		Element: Cryo, Motif: MotifCrystal, Opening: OpeningGanyu, Chrome: ChromeCrystal, Ornament: OrnamentQingxin,
-		WallTint: 0.15, Scrim: 0.32,
+		WallTint: 0.15, Scrim: 0.14,
 		CardBg: ui.Hex("#14314A"), Art: ArtNone,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
 		// 甘雨壁纸动态，分两层机制：
@@ -365,7 +367,7 @@ var all = []Character{
 		Motto: "琉焰华舞", Constellation: "C A R A S S I U S   A U R A T U S",
 		Scene: "稻妻 · 夏祭", SceneEN: "FIREWORKS AT DUSK",
 		Element: Pyro, Motif: MotifFlame, Opening: OpeningYoimiya, Chrome: ChromePyro, Ornament: OrnamentGoldfish,
-		WallTint: 0.18, Scrim: 0.47,
+		WallTint: 0.18, Scrim: 0.18,
 		CardBg: ui.Hex("#3E2418"), Art: ArtNone,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
 		// 宵宫：人物从 .hbc 网格烤进背景图（原图的背景是没有人的空场景）。
@@ -386,7 +388,7 @@ var all = []Character{
 		Element: Electro, Motif: MotifBolt, Opening: OpeningYae, Chrome: ChromeElectro, Ornament: OrnamentSakura,
 		// 压暗值按合成后壁纸的实测亮度给（0.70 → 0.32+0.38×0.55 ≈ 0.53，取 0.56 留一点余量）。
 		// 原背景是一整片亮樱色（0.81），烤进人物后暗部变多，0.66 会把人物压得看不清。
-		WallTint: 0.15, Scrim: 0.56,
+		WallTint: 0.15, Scrim: 0.20,
 		CardBg: ui.Hex("#37203F"), Art: ArtNone,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
 		// 八重神子：原图的背景只有樱花枝（人物也是 .hbc 网格，已烤进 bg.jpg）。
@@ -409,7 +411,7 @@ var all = []Character{
 		Motto: "白草净华", Constellation: "S A P I E N T I A   O R O M A S D I S",
 		Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
 		Element: Dendro, Motif: MotifLeaf, Opening: OpeningNahida, Chrome: ChromeDendro, Ornament: OrnamentSprig,
-		WallTint: 0.15, Scrim: 0.66,
+		WallTint: 0.15, Scrim: 0.22,
 		CardBg: ui.Hex("#1F3A22"), Art: ArtNone,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
 		// 纳西妲：整幅都是她的特写。人物遮罩从「细节强度」推（虚化的背景细节少、
@@ -426,7 +428,7 @@ var all = []Character{
 		Motto: "不休独舞", Constellation: "A N I M U L A   C H O R A G I",
 		Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
 		Element: Hydro, Motif: MotifWave, Opening: OpeningFurina, Chrome: ChromeHydro, Ornament: OrnamentTopHat,
-		WallTint: 0.14, Scrim: 0.35,
+		WallTint: 0.14, Scrim: 0.14,
 		CardBg: ui.Hex("#15294A"), Art: ArtNone,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
 		// 芙宁娜：发丝遮罩用原项目的 furina-sway.png（就是她发梢的形状），
@@ -442,7 +444,7 @@ var all = []Character{
 		Motto: "百巧千机", Constellation: "F L O S C U L I   I M P L E X I",
 		Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
 		Element: Anemo, Motif: MotifWind, Opening: OpeningFaruzan, Chrome: ChromeAnemo, Ornament: OrnamentPolyhedron,
-		WallTint: 0.16, Scrim: 0.47,
+		WallTint: 0.16, Scrim: 0.18,
 		CardBg: ui.Hex("#17342F"), Art: ArtNone,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
 		// 珐露珊：原项目只有一张流向图（没有遮罩），发丝区按「头顶 + 左侧马尾」
@@ -460,7 +462,7 @@ var all = []Character{
 		Motto: "尘世闲游", Constellation: "L A P I S   D E I",
 		Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
 		Element: Geo, Motif: MotifGeo, Opening: OpeningZhongli, Chrome: ChromeGeo, Ornament: OrnamentStoneSeal,
-		WallTint: 0.18, Scrim: 0.62,
+		WallTint: 0.18, Scrim: 0.22,
 		CardBg: ui.Hex("#392C14"), Art: ArtNone,
 		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),
 		// 钟离：壁纸是 .hbw 分层容器，人物是第 7 层（id=85），发丝权重取该层
@@ -496,8 +498,8 @@ func ganyuTokens() Tokens {
 	// 带壁纸后，浮层与卡片都用半透明：壁纸从下面透出来，同时保证文字可读。
 	// 卡片用「浅色叠加」而不是深色——在暗色壁纸上这是提亮，才接近参考图的通透感。
 	t.WinFill = ui.RGBA(8, 14, 24, 0.55)
-	t.Sidebar = ui.RGBA(8, 16, 28, 0.42)
-	t.Card = ui.RGBA(150, 190, 230, 0.10)
+	t.Sidebar = ui.RGBA(8, 16, 28, 0.54)
+	t.Card = ui.RGBA(150, 190, 230, 0.13)
 	t.CardStroke = ui.RGBA(180, 215, 255, 0.20)
 	t.Text = ui.Hex("#E6F2FF")
 	t.TextMuted = ui.Hex("#9FB6D0")
@@ -509,8 +511,8 @@ func ganyuTokens() Tokens {
 func yoimiyaTokens() Tokens {
 	t := derive(ui.Hex("#FFB27A"))
 	t.WinFill = ui.RGBA(22, 12, 9, 0.56)
-	t.Sidebar = ui.RGBA(26, 14, 10, 0.44)
-	t.Card = ui.RGBA(230, 170, 120, 0.11)
+	t.Sidebar = ui.RGBA(26, 14, 10, 0.56)
+	t.Card = ui.RGBA(230, 170, 120, 0.14)
 	t.CardStroke = ui.RGBA(255, 200, 160, 0.22)
 	t.Text = ui.Hex("#FFF0E2")
 	t.TextMuted = ui.Hex("#D6B49B")
@@ -522,8 +524,8 @@ func yoimiyaTokens() Tokens {
 func yaeTokens() Tokens {
 	t := derive(ui.Hex("#C9A6FF"))
 	t.WinFill = ui.RGBA(14, 11, 24, 0.56)
-	t.Sidebar = ui.RGBA(17, 13, 28, 0.44)
-	t.Card = ui.RGBA(180, 160, 230, 0.11)
+	t.Sidebar = ui.RGBA(17, 13, 28, 0.56)
+	t.Card = ui.RGBA(180, 160, 230, 0.14)
 	t.CardStroke = ui.RGBA(210, 190, 255, 0.22)
 	t.Text = ui.Hex("#F0E9FF")
 	t.TextMuted = ui.Hex("#B6A8D4")
@@ -535,8 +537,8 @@ func yaeTokens() Tokens {
 func zhongliTokens() Tokens {
 	t := derive(ui.Hex("#E8C87A"))
 	t.WinFill = ui.RGBA(24, 18, 10, 0.56)
-	t.Sidebar = ui.RGBA(28, 21, 12, 0.44)
-	t.Card = ui.RGBA(232, 200, 122, 0.11)
+	t.Sidebar = ui.RGBA(28, 21, 12, 0.56)
+	t.Card = ui.RGBA(232, 200, 122, 0.14)
 	t.CardStroke = ui.RGBA(255, 226, 150, 0.22)
 	t.Text = ui.Hex("#FFF6E2")
 	t.TextMuted = ui.Hex("#E4D2AE")

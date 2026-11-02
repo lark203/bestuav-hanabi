@@ -36,9 +36,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 ASSETS = os.path.join(ROOT, "assets")
 DEFAULT_REF = r"D:\workspace\opensource\HanaBi-ui-Genshin"
 
-# 遮罩统一 1920×1080（16:9）。着色器按「图片 UV × 遮罩像素尺寸」采样，
-# 所以遮罩分辨率和背景分辨率不必相同；边缘靠双线性插值，1/2 分辨率足够软。
-MASK_W, MASK_H = 1920, 1080
+# 遮罩统一 960×540（16:9）。着色器按「图片 UV × 遮罩像素尺寸」采样，
+# 遮罩分辨率和背景分辨率不必相同；它只是位移权重，边缘靠双线性插值本来就软，
+# 960 宽在 4K 上也看不出区别——但内存只有 1920 版的四分之一（2MB vs 8.3MB）。
+MASK_W, MASK_H = 960, 540
 
 
 # ---------------------------------------------------------------- 基础工具

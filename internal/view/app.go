@@ -357,17 +357,26 @@ func (a *App) goPage(c *ui.Context, page string) {
 // SetWindow 由 main 注入窗口句柄。
 func (a *App) SetWindow(w *mygo.Window) { a.win = w }
 
-// 壁纸与压暗层。壁纸路径来自当前角色（assets 内部缓存），压暗层保证半透明 UI 上文字可读。
+// 壁纸与压暗层。壁纸路径来自当前角色（assets 内部缓存），压暗层只托住大标题。
 var (
 	// 顶部压深带：壁纸上部常有建筑、灯火的亮部，大标题压在上面读不清。
-	// 从顶部 0.72 的黑蓝渐隐到透明（190 DIP 处收干净），既托住标题又不压掉通透感。
-	// 强度给得比较高是因为有的壁纸本身就是浅色立绘（纳西妲、八重神子）。
+	// 从顶部 0.52 的黑蓝渐隐到透明（170 DIP 处收干净）。
+	// 原来是 0.72 / 190：压得太重，整幅壁纸上沿都发黑；现在只托住标题这一条。
 	topScrim = ui.LinearGradient{
-		From:  ui.RGBA(6, 12, 22, 0.72),
+		From:  ui.RGBA(6, 12, 22, 0.52),
 		To:    ui.Transparent,
 		Angle: 180, // 从上到下
 	}
-	topScrimH = float32(190)
+	topScrimH = float32(170)
+
+	// 底部压深带：状态栏那两行小字直接压在壁纸上，壁纸提亮之后最容易糊掉。
+	// 只有 96 DIP 高，从透明渐到 0.42，不影响中部的画面。
+	bottomScrim = ui.LinearGradient{
+		From:  ui.Transparent,
+		To:    ui.RGBA(6, 12, 22, 0.42),
+		Angle: 180,
+	}
+	bottomScrimH = float32(96)
 )
 
 // View 每帧构建根视图：壁纸在最底 → 中间区域（侧栏 + 右侧内容）→ 整宽底部状态栏。
@@ -494,6 +503,9 @@ func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch theme.Character,
 
 	// 顶部再压一层渐变，托住标题区（在玻璃条之下，不影响玻璃本身的通透）。
 	p.FillGradient(ui.Rect{X: r.X, Y: r.Y, W: r.W, H: topScrimH}, topScrim, 0)
+
+	// 底部一小条渐变，托住状态栏。
+	p.FillGradient(ui.Rect{X: r.X, Y: r.Y + r.H - bottomScrimH, W: r.W, H: bottomScrimH}, bottomScrim, 0)
 
 	// 主题专属的环境粒子（樱花 / 火星 / 光尘 / 气泡 / 金屑）。
 	// 画在压暗层之上：粒子是"发光体"，被压暗会变成灰色噪点。
@@ -794,11 +806,12 @@ func (a *App) crystalButton(p *ui.Painter, r ui.Rect, idx int, hv float32) {
 // content 内容区：按当前页分发。
 //
 // 只压一层很淡的暗色托文字，不再包整块面板——参考图里内容是直接浮在
-// 壁纸上的，只有卡片本身是一块块玻璃。
+// 壁纸上的，只有卡片本身是一块块玻璃。这层从 0.28 降到 0.26：
+// 壁纸压暗值整体下调后，内容区不该再叠一层重阴影，文字对比交给卡片与顶部渐变。
 func (a *App) content(c *ui.Context) {
 	ui.Column(c).Grow(1).Clip().
 		Draw(func(p *ui.Painter, r ui.Rect) {
-			p.Fill(r, ui.RGBA(6, 11, 18, 0.28), 0)
+			p.Fill(r, ui.RGBA(6, 11, 18, 0.26), 0)
 			// 角色主题：内容区右下角一枚很大的淡纹（参考各角色 _ui.cpp 的 Chrome）。
 			// 画在暗色底之后、页面之前，所以它垫在卡片与文字下面。
 			if a.char.Ornament != theme.OrnamentNone {
