@@ -95,7 +95,7 @@
 
 - 开场与标识都是**2D 矢量近似**：原版的 3D 材质网格、逐顶点着色和体积粒子没有 1:1 复刻，
   分镜的构图/节奏/元素已经按 `characters/*/*_intro.cpp` 对齐
-- 发布：在 GitHub 创建 `bestuav/bestuav-hanabi` 后，用 `mygo build -upload` 把
+- 发布：GitHub 仓库 `lark203/bestuav-hanabi` 已创建；用 `mygo build -upload` 把
   安装包、更新压缩包与 `update-windows-amd64.json` 上传为 draft release；发布后
   自动更新才能端到端生效
 - 壁纸页按需求保持现状（占位）；黑白基础主题暂不做；最小化退场动画待定
@@ -174,7 +174,7 @@ go build ./...
 ## 打包与自动更新
 
 `mygo.json` 的 `updates.publicKey` 是更新签名公钥，`updates.github` 指向
-`bestuav/bestuav-hanabi`：`mygo build -upload` 会把安装包、更新压缩包与
+`lark203/bestuav-hanabi`：`mygo build -upload` 会把安装包、更新压缩包与
 `update-windows-amd64.json` 作为 GitHub draft release 上传，发布后应用从
 GitHub 的 latest release 读取 manifest。私钥**不进仓库**，放在仓库外的
 `D:\workbuddy\bestuav-hanabi-update-keys\mygo-update.key`（或 CI secret），
@@ -196,9 +196,46 @@ go tool mygo build -upload
 - 自动更新的检查和安装都在 goroutine 里，UI 只读原子进度；开发/测试构建
   `Updater.Enabled()=false`，不会联网。
 - `go tool mygo build` 在没有私钥时会跳过更新文件；发布版必须带私钥构建。
-- 当前 GitHub 仓库还没创建；未创建时 `mygo build` 计算 delta 会因读不到 release
-  给出 warning，创建仓库并发布首个 release 后消失。首次发布需要 `GH_TOKEN`，
+- 当前 GitHub 仓库已创建但还没有 release；首次发布需要 `GH_TOKEN`，
   并用 `mygo build -upload` 生成 draft，再在 GitHub 上发布。
+
+## 自动构建（GitHub Actions）
+
+`.github/workflows/release.yml` 在推送 `v*` tag 时创建 draft release，并行构建
+Windows / Linux / macOS 并上传安装包、更新压缩包和 manifest。原生 UI 不需要
+Bun，Windows 安装包在 Ubuntu runner 上装 NSIS 生成。
+
+**必须配置的 secret**：
+
+```bash
+# 更新签名私钥（仓库外的 mygo-update.key）
+gh secret set MYGO_UPDATER_PRIVATE_KEY < D:/workbuddy/bestuav-hanabi-update-keys/mygo-update.key
+```
+
+`GH_TOKEN` 由 workflow 的 `github.token` 提供，不需要手动配置；`permissions.contents: write`
+已经写在 workflow 里。**不要把私钥提交到仓库**。
+
+发布流程：
+
+```bash
+# mygo.json 的 version 与 tag 必须一致，例如 0.1.0 / v0.1.0
+git tag v0.1.0
+git push github v0.1.0
+```
+
+然后在 GitHub 的 Actions 里等三个平台跑完，检查 draft release 并发布。发布后
+旧版本就能自动更新。
+
+可选、当前**没有配置**的签名：
+
+- Windows 代码签名：需要 `WINDOWS_CERTIFICATE`（base64 pfx）和
+  `WINDOWS_CERTIFICATE_PASSWORD`，并在 workflow 里加 osslsigncode 步骤；不加也能构建，
+  但 SmartScreen 会提示未知发布者。
+- macOS Developer ID / notarization：需要 `MACOS_CERTIFICATE`、密码、`APPLE_ID`、
+  `APPLE_TEAM_ID`、`APPLE_APP_PASSWORD`；不加则是 ad hoc 签名，别的 Mac 上
+  Gatekeeper 会拦截。
+
+`assets/` 已随仓库提交（约 18MB），runner 不需要额外下载壁纸。
 
 ## 目录
 
@@ -242,7 +279,7 @@ go test ./...          # 时间轴/粒子/姿态 + 开场渲染冒烟
 
 ## 路线图
 
-1. **发布第一个 GitHub release**：在 `bestuav/bestuav-hanabi` 用 `mygo build -upload`
+1. **发布第一个 GitHub release**：在 `lark203/bestuav-hanabi` 用 `mygo build -upload`
    生成 draft release，验证「检查 → 下载 → 安装 → 重启」整条链路
 2. **可选**：标识/开场的 3D 材质网格、最小化退场动画、更多分镜细节
 3. 壁纸页保持现状；黑白基础主题不做
