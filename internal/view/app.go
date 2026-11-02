@@ -51,6 +51,11 @@ type App struct {
 	// filter 是主题库的元素筛选：-1 表示「全部」，否则是 theme.Element 的数值。
 	filter int
 
+	// themeView 是主题页的两个视图：0 主题库 / 1 外观与启动。
+	themeView int
+	// viewAt 是当前视图出现的时间，切换视图时内容淡入。
+	viewAt time.Time
+
 	// pageAt 是当前页第一次出现的时间，用来做 0.22 秒的入场位移与淡入。
 	pageAt time.Time
 
@@ -77,6 +82,7 @@ const animFPS = 12
 const (
 	themeFade = 420 * time.Millisecond // 参考 Shell::SetTheme 的 0.42s
 	pageFade  = 220 * time.Millisecond // 页面入场：位移 + 淡入
+	viewFade  = 180 * time.Millisecond // 主题页两个视图切换：淡入
 	saveDelay = 300 * time.Millisecond // 设置落盘防抖
 )
 
@@ -118,6 +124,7 @@ func newApp(s settings.Settings, persist bool) *App {
 		clock:     time.Now,
 		animPlay:  play,
 		filter:    -1,
+		viewAt:    time.Now().Add(-time.Hour), // 启动视图不做淡入
 		pageAt:    time.Now().Add(-time.Hour), // 启动页不做入场动画
 		introDone: !s.IntroPlay,
 	}
@@ -304,8 +311,33 @@ func (a *App) pageProgress(now time.Time) float32 {
 	return k * k * k * (k*(k*6-15) + 10)
 }
 
+// viewProgress 返回主题页视图切换的淡入进度 0..1。
+func (a *App) viewProgress(now time.Time) float32 {
+	if !a.settings.Animations {
+		return 1
+	}
+	k := float32(now.Sub(a.viewAt).Seconds() * 1000 / float64(viewFade/time.Millisecond))
+	if k >= 1 {
+		return 1
+	}
+	if k < 0 {
+		k = 0
+	}
+	return k * k * k * (k*(k*6-15) + 10)
+}
+
 // goPage 切换页面，并重新开始入场动画。
 func (a *App) goPage(c *ui.Context, page string) {
+	// 从「外观与启动」回到主题库：只切视图，不换页；点侧栏「主题库」时
+	// 用户预期看到的是卡片，而不是停在设置面板上。
+	if page == "library" && a.themeView != 0 {
+		a.themeView = 0
+		if a.page == "library" {
+			a.viewAt = a.clock()
+			c.Invalidate()
+			return
+		}
+	}
 	if a.page == page {
 		return
 	}
@@ -346,6 +378,10 @@ func (a *App) View(c *ui.Context) {
 
 	// 页面入场：位移 + 淡入，详见 content。
 	if a.pageProgress(now) < 1 {
+		c.Invalidate()
+	}
+	// 主题页视图切换的淡入。
+	if a.viewProgress(now) < 1 {
 		c.Invalidate()
 	}
 

@@ -20,54 +20,71 @@ const (
 	scrollReserve = 18
 )
 
-// libraryPage 主题库：标题区 + 元素筛选 + 卡片网格（列数随窗口宽度自适应）。
+// libraryPage 主题库：标题区 + 两个视图（主题库 / 外观与启动）。
 //
-// 页面里没有任何角色名或颜色常量——全部来自 theme.All()。
+// 主题库视图：元素筛选 + 卡片网格；外观与启动视图：字号、壁纸、动效与启动。
+// 两个视图共用一个标题行，分段控件只在页内切换，不再跳侧栏的「设置」。
 func (a *App) libraryPage(c *ui.Context) {
-	// 标题与筛选条固定不动，只有下面的卡片滚动（参考图行为）。
-	a.pageHeader(c)
-	a.elementFilter(c)
+	// 标题固定不动；下面的视图内容在切换时淡入（viewProgress）。
+	a.pageHeader(c, a.themeView)
 
-	all := theme.All()
-	shown := make([]theme.Character, 0, len(all))
-	for _, ch := range all {
-		if a.filter < 0 || int(ch.Element) == a.filter {
-			shown = append(shown, ch)
+	body := ui.Column(c).Grow(1)
+	if k := a.viewProgress(a.clock()); k < 1 {
+		body = body.Opacity(k).Transform(ui.Translation(0, (1-k)*6))
+	}
+	body.Children(func() {
+		if a.themeView == 1 {
+			a.appearanceView(c)
+			return
 		}
-	}
 
-	// 列数随窗口宽度自适应（flex-wrap 的效果）：卡片在行内撑满剩余宽度，
-	// 窗口变宽列数变多、变窄列数变少，始终没有右侧的空档。
-	// 2~4 列：以卡片最小舒适宽度约 280 DIP 划档。
-	w, _ := c.Size()
-	avail := w - sidebarW - 1 - pagePadX*2 - scrollReserve
-	cols := int((avail + cardGap) / (cardMinW + cardGap))
-	if cols < 2 {
-		cols = 2
-	}
-	if cols > 4 {
-		cols = 4
-	}
-	// 卡片用显式宽度而不是 Grow(1)：整行正好填满，最后一行不满时
-	// 卡片保持同宽（Grow 会把末行那几张拉通栏）。
-	cardW := (avail - cardGap*float32(cols-1)) / float32(cols)
+		a.elementFilter(c)
 
-	ui.Scroll(c).Grow(1).Children(func() {
-		// 右侧让出滚动条的宽度：条覆盖绘制，卡片不能伸到它底下。
-		ui.Column(c).Padding(4, scrollReserve, 10, 0).Gap(cardGap).Children(func() {
-			for i := 0; i < len(shown); i += cols {
-				ui.Row(c).Gap(cardGap).AlignItems(ui.Start).Children(func() {
-					for j := i; j < i+cols && j < len(shown); j++ {
-						a.characterCard(c, shown[j], cardW)
-					}
-				})
+		all := theme.All()
+		shown := make([]theme.Character, 0, len(all))
+		for _, ch := range all {
+			if a.filter < 0 || int(ch.Element) == a.filter {
+				shown = append(shown, ch)
 			}
+		}
+
+		// 列数随窗口宽度自适应（flex-wrap 的效果）：卡片在行内撑满剩余宽度，
+		// 窗口变宽列数变多、变窄列数变少，始终没有右侧的空档。
+		// 2~4 列：以卡片最小舒适宽度约 280 DIP 划档。
+		w, _ := c.Size()
+		avail := w - sidebarW - 1 - pagePadX*2 - scrollReserve
+		cols := int((avail + cardGap) / (cardMinW + cardGap))
+		if cols < 2 {
+			cols = 2
+		}
+		if cols > 4 {
+			cols = 4
+		}
+		// 卡片用显式宽度而不是 Grow(1)：整行正好填满，最后一行不满时
+		// 卡片保持同宽（Grow 会把末行那几张拉通栏）。
+		cardW := (avail - cardGap*float32(cols-1)) / float32(cols)
+
+		ui.Scroll(c).Grow(1).Children(func() {
+			// 右侧让出滚动条的宽度：条覆盖绘制，卡片不能伸到它底下。
+			ui.Column(c).Padding(4, scrollReserve, 10, 0).Gap(cardGap).Children(func() {
+				for i := 0; i < len(shown); i += cols {
+					ui.Row(c).Gap(cardGap).AlignItems(ui.Start).Children(func() {
+						for j := i; j < i+cols && j < len(shown); j++ {
+							a.characterCard(c, shown[j], cardW)
+						}
+					})
+				}
+			})
 		})
 	})
 }
 
 // pageHeader 标题行：大标题 + 英文小标 + 副标题，右上角是分段控件。
-func (a *App) pageHeader(c *ui.Context) {
+func (a *App) pageHeader(c *ui.Context, view int) {
+	subtitle := "给工作空间，一点自己的气质。"
+	if view == 1 {
+		subtitle = "字号、壁纸显现、动效与启动方式。"
+	}
 	ui.Row(c).AlignItems(ui.End).Children(func() {
 		ui.Column(c).Gap(3).Grow(1).Children(func() {
 			ui.Row(c).AlignItems(ui.End).Gap(9).Children(func() {
@@ -75,14 +92,22 @@ func (a *App) pageHeader(c *ui.Context) {
 				ui.Text(c, "APPEARANCE").FontSize(a.fs(9)).TextColor(a.tok.TextFaint).
 					Padding(0, 0, 4, 0)
 			})
-			ui.Text(c, "给工作空间，一点自己的气质。").FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
+			ui.Text(c, subtitle).FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
 		})
-		a.segmented(c, []string{"主题库", "外观与启动"}, 0, func(i int) {
-			if i == 1 {
-				a.goPage(c, "settings")
-			}
+		a.segmented(c, []string{"主题库", "外观与启动"}, view, func(i int) {
+			a.switchThemeView(c, i)
 		})
 	})
+}
+
+// switchThemeView 在主题库 / 外观与启动之间切换；分段控件只改视图，不改页面。
+func (a *App) switchThemeView(c *ui.Context, view int) {
+	if a.themeView == view {
+		return
+	}
+	a.themeView = view
+	a.viewAt = a.clock()
+	c.Invalidate()
 }
 
 // segmented 画分段控件；onSelect 收到被点的那一段。

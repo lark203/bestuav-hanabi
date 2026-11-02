@@ -1,19 +1,17 @@
 package view
 
 import (
-	"math"
-
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
 	"bestuav-hanabi/internal/settings"
-	"bestuav-hanabi/internal/theme"
 )
 
-// settingsPage 是「外观与启动」：字号、壁纸显现、动效开关与下次启动的主题。
+// settingsPage 是应用级设置：版本与更新、数据与存储、关于。
 //
-// 控件尽量用 mygo 自带的 Slider / Switch / Segmented / Select/ Button：
-// 它们跟着 c.SetTheme 走，不需要再手写一套滑杆和开关；只有面板、标题和
-// 说明文字是这里画的。
+// 外观与启动不在这里——它们跟当前角色强相关，放在主题页的第二个视图
+// （appearance.go）。这样侧栏「设置」不会再和主题页的分段控件抢同一个
+// 页面，设置也能继续长更新、存储、快捷键这些内容。
 func (a *App) settingsPage(c *ui.Context) {
 	ui.Row(c).AlignItems(ui.End).Children(func() {
 		ui.Column(c).Gap(3).Grow(1).Children(func() {
@@ -22,162 +20,78 @@ func (a *App) settingsPage(c *ui.Context) {
 				ui.Text(c, "PREFERENCES").FontSize(a.fs(9)).TextColor(a.tok.TextFaint).
 					Padding(0, 0, 4, 0)
 			})
-			ui.Text(c, "调好一次，之后都按这个来。").FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
-		})
-		a.segmented(c, []string{"主题库", "外观与启动"}, 1, func(i int) {
-			if i == 0 {
-				a.goPage(c, "library")
-			}
+			ui.Text(c, "版本、数据与关于。").FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
 		})
 	})
 
 	ui.Row(c).Grow(1).Gap(16).AlignItems(ui.Stretch).Children(func() {
-		a.appearancePanel(c)
-		a.startupPanel(c)
+		a.versionPanel(c)
+		a.dataPanel(c)
 	})
 }
 
-// appearancePanel 左侧：场景与文字。
-func (a *App) appearancePanel(c *ui.Context) {
-	a.panel(c, "场景与文字", "壁纸、动效与整体字号", func() {
-		// 壁纸显现：0.2–1.0，越小压暗越重。
-		a.sliderRow(c, "壁纸显现", &a.settings.WallpaperVis, settings.WallpaperMin, settings.WallpaperMax,
-			func(v float64) string { return percent(v) }, func(v float64) {
-				a.settings.WallpaperVis = v
-				a.markDirty(c)
-			})
-
-		// 背景流动：关掉后壁纸完全静止（wallpaper.Draw 的 play=0）。
-		beforePlay := a.settings.WallpaperPlay
-		a.switchRow(c, "背景流动", "人物的呼吸与发丝漂动", &a.settings.WallpaperPlay)
-		if a.settings.WallpaperPlay != beforePlay {
-			if a.settings.WallpaperPlay {
-				a.animPlay = 1
-			} else {
-				a.animPlay = 0
-			}
-			a.markDirty(c)
-		}
-
-		// 开场动画：下次启动生效。
-		beforeIntro := a.settings.IntroPlay
-		a.switchRow(c, "启动时播放开场", "下次启动生效 · 6.2 秒", &a.settings.IntroPlay)
-		if a.settings.IntroPlay != beforeIntro {
-			a.markDirty(c)
-		}
-
-		// 整体字号：100–125，默认 112；滑杆拖到小数时取整。
-		// 默认按钮放在同一行，省下一整行高度——1000×640、125% 时刚好不溢出。
-		ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-			ui.Text(c, "整体字号").FontSize(a.fs(13)).TextColor(a.tok.TextMuted).Grow(1)
-			ui.Text(c, fontPercent(a.settings.FontPercent)).
-				FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
-			if ui.Button(c, "默认").Clicked() {
-				a.settings.FontPercent = settings.FontDefault
-				a.markDirty(c)
-			}
-		})
-		beforeFont := a.settings.FontPercent
-		ui.Row(c).Children(func() {
-			ui.Slider(c, &a.settings.FontPercent, settings.FontMin, settings.FontMax).Label("整体字号").Grow(1)
-		})
-		if a.settings.FontPercent != beforeFont {
-			a.settings.FontPercent = math.Round(a.settings.FontPercent)
-			a.markDirty(c)
-		}
+// versionPanel 左侧：版本与更新。
+func (a *App) versionPanel(c *ui.Context) {
+	a.panel(c, "版本与更新", "当前构建与自动更新状态", func() {
+		ui.Text(c, "花火 HanaBi").FontSize(a.fs(19)).Bold().TextColor(a.tok.Text)
+		ui.Text(c, "版本 "+appVersion()).FontSize(a.fs(11)).TextColor(a.tok.TextMuted)
+		ui.Text(c, "以角色主题为核心的桌面 UI。").
+			FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
 
 		ui.Spacer(c)
 
-		ui.Text(c, "当前主题："+a.char.NameCN+" · "+a.char.Epithet).
-			FontSize(a.fs(11)).TextColor(a.tok.TextMuted)
-		ui.Row(c).Children(func() {
-			ui.Spacer(c)
-			if ui.Button(c, "恢复默认设置").Clicked() {
-				a.resetSettings(c)
-			}
-		})
-	})
-}
-
-// startupPanel 右侧：交互动效与启动主题。
-func (a *App) startupPanel(c *ui.Context) {
-	a.panel(c, "交互与启动", "下次启动时用哪个角色主题", func() {
-		beforeAnimations := a.settings.Animations
-		a.switchRow(c, "流畅动效", "页面与主题切换的过渡", &a.settings.Animations)
-		if a.settings.Animations != beforeAnimations {
-			if !a.settings.Animations {
-				a.finishSwitch() // 正在过渡时直接到位
-			}
-			a.markDirty(c)
-		}
-
-		beforeReplay := a.settings.ReplayIntro
-		a.switchRow(c, "换主题时重播开场", "每次切换都再看一遍 6.2 秒", &a.settings.ReplayIntro)
-		if a.settings.ReplayIntro != beforeReplay {
-			a.markDirty(c)
-		}
-
-		ui.Text(c, "下次启动").FontSize(a.fs(13)).TextColor(a.tok.TextMuted)
-		mode := int(a.settings.StartupMode)
-		ui.Row(c).Children(func() {
-			ui.Segmented(c, &mode, "跟随当前", "指定主题", "随机角色").Grow(1)
-		})
-		if mode != int(a.settings.StartupMode) {
-			a.settings.StartupMode = settings.Startup(mode)
-			a.markDirty(c)
-		}
-
-		if a.settings.StartupMode == settings.StartupFixed {
-			ui.Row(c).Wrap().Gap(5).Children(func() {
-				for _, ch := range theme.All() {
-					selected := ch.ID == a.settings.StartupTheme
-					chip := ui.Row(c).Height(24).Padding(0, 9).Radius(7).
-						AlignItems(ui.Center).Justify(ui.Center)
-					color := a.tok.TextMuted
-					if selected {
-						chip.Background(a.tok.Accent.Alpha(.20))
-						chip.Border(1, a.tok.Accent.Alpha(.55))
-						color = a.tok.Accent
-					} else {
-						chip.Background(ui.RGBA(255, 255, 255, 0.06))
-						chip.Border(1, a.tok.CardStroke)
-					}
-					if chip.Clicked() && !selected {
-						a.settings.StartupTheme = ch.ID
-						a.markDirty(c)
-					}
-					chip.Children(func() {
-						ui.Text(c, ch.NameCN).FontSize(a.fs(11)).TextColor(color)
-					})
-				}
-			})
-			ui.Text(c, "启动时使用所选主题及其开场动画。").
-				FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
-		} else if a.settings.StartupMode == settings.StartupRandom {
-			ui.Text(c, "每次都从角色主题里随机一个（不含黑白基础主题）。").
-				FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
-		} else {
-			ui.Text(c, "记住上次使用的角色主题，下次从它开始。").
-				FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
-		}
-
-		ui.Text(c, "下次启动："+startupSummary(a.settings)).
-			FontSize(a.fs(11)).TextColor(a.tok.Accent)
-
-		ui.Spacer(c)
-
-		ui.Text(c, "设置保存在用户目录，关闭应用后仍然有效。").
+		ui.Text(c, "自动更新").FontSize(a.fs(13)).TextColor(a.tok.Text)
+		ui.Text(c, "尚未配置：打包与签名完成后接入更新源。").
+			FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
+		ui.Text(c, "接入后这里会显示检查、下载与安装的进度。").
 			FontSize(a.fs(10)).TextColor(a.tok.TextFaint.Alpha(.8))
 	})
 }
 
-// panel 是设置页的一块面板：标题 + 副标题 + 内容，半透明卡片。
+// dataPanel 右侧：设置文件、恢复默认与关于。
+func (a *App) dataPanel(c *ui.Context) {
+	a.panel(c, "数据与关于", "设置保存在用户目录，关闭应用后仍然有效", func() {
+		path, err := settings.DefaultPath()
+		if err != nil || path == "" {
+			path = "（无法定位用户目录）"
+		}
+
+		ui.Text(c, "设置文件").FontSize(a.fs(13)).TextColor(a.tok.Text)
+		ui.Text(c, path).FontSize(a.fs(10)).TextColor(a.tok.TextFaint).
+			SingleLine().Ellipsis("…").Tooltip(path)
+
+		ui.Row(c).Gap(8).Children(func() {
+			if ui.Button(c, "复制路径").Clicked() {
+				c.WriteClipboard(path)
+			}
+			if ui.Button(c, "恢复默认设置").Clicked() {
+				a.resetSettings(c)
+			}
+		})
+		ui.Text(c, "恢复默认会重置字号、壁纸显现、动效与启动方式，保留当前主题。").
+			FontSize(a.fs(10)).TextColor(a.tok.TextFaint.Alpha(.8))
+
+		ui.Spacer(c)
+
+		ui.Text(c, "关于").FontSize(a.fs(13)).TextColor(a.tok.Text)
+		ui.Text(c, "角色名称与相关视觉元素归原版权方所有，本项目仅作技术学习与本地演示。").
+			FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
+		ui.Row(c).Children(func() {
+			ui.Link(c, "参考 HanaBi-ui-Genshin",
+				"https://github.com/xiaoyeuzixi/HanaBi-ui-Genshin").FontSize(a.fs(11))
+		})
+	})
+}
+
+// panel 是设置类页面的一块面板：标题 + 副标题 + 内容。
 func (a *App) panel(c *ui.Context, title, sub string, body func()) {
 	ui.Column(c).Grow(1).MaxHeight(450).Padding(18, 16).Gap(12).Radius(a.tok.Radius).
 		Border(1, a.tok.CardStroke).Background(a.tok.WinFill.Mix(ui.Hex("#05080E"), .30)).
 		Children(func() {
 			ui.Text(c, title).FontSize(a.fs(15)).Bold().TextColor(a.tok.Text)
-			ui.Text(c, sub).FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
+			if sub != "" {
+				ui.Text(c, sub).FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
+			}
 			body()
 		})
 }
@@ -192,83 +106,11 @@ func (a *App) resetSettings(c *ui.Context) {
 	a.markDirty(c)
 }
 
-// switchRow 是一行「标签 + 说明 + Switch」；Switch 用 mygo 自带的。
-func (a *App) switchRow(c *ui.Context, label, detail string, on *bool) {
-	ui.Row(c).AlignItems(ui.Center).Gap(10).Children(func() {
-		ui.Column(c).Gap(1).Grow(1).Children(func() {
-			ui.Text(c, label).FontSize(a.fs(13)).TextColor(a.tok.Text)
-			if detail != "" {
-				ui.Text(c, detail).FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
-			}
-		})
-		ui.Switch(c, on).Label(label)
-	})
-}
-
-// sliderRow 是「标签 + 当前值」一行，下面跟一条 mygo Slider。
-// value 直接指向设置字段，拖动时不会丢；onChange 只在值真的变了时调用。
-func (a *App) sliderRow(c *ui.Context, label string, value *float64, lo, hi float64,
-	format func(float64) string, onChange func(float64)) {
-	ui.Row(c).AlignItems(ui.End).Children(func() {
-		ui.Text(c, label).FontSize(a.fs(13)).TextColor(a.tok.TextMuted).Grow(1)
-		ui.Text(c, format(*value)).FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
-	})
-	before := *value
-	ui.Row(c).Children(func() {
-		ui.Slider(c, value, lo, hi).Label(label).Grow(1)
-	})
-	if *value != before {
-		onChange(*value)
+// appVersion 读 mygo.json 里的版本；测试/未打包时给一个可读的兜底。
+func appVersion() string {
+	if v := mygo.App.Version(); v != "" {
+		return v
 	}
-}
-
-// startupSummary 用一句人话描述下次启动会选谁。
-func startupSummary(s settings.Settings) string {
-	switch s.StartupMode {
-	case settings.StartupFixed:
-		if c, ok := theme.ByID(s.StartupTheme); ok {
-			return c.NameCN + " · " + c.Epithet
-		}
-		return "未选择"
-	case settings.StartupRandom:
-		return "随机角色"
-	default:
-		if c, ok := theme.ByID(s.Theme); ok {
-			return c.NameCN + " · " + c.Epithet
-		}
-		return "默认角色"
-	}
-}
-
-// percent 把 0.82 显示成 82%（壁纸显现的 0..1 值）。
-func percent(v float64) string {
-	return itoa(int(math.Round(v*100))) + "%"
-}
-
-// fontPercent 把 112 显示成 112%（字号本身就是百分数）。
-func fontPercent(v float64) string {
-	return itoa(int(math.Round(v))) + "%"
-}
-
-// itoa 是 strconv.Itoa 的小替身，避免为了一个数字引入 import。
-func itoa(v int) string {
-	if v == 0 {
-		return "0"
-	}
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	var b [8]byte
-	i := len(b)
-	for v > 0 {
-		i--
-		b[i] = byte('0' + v%10)
-		v /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
+	// go test 下没有 mygo.json；mygo dev/build 会读到真实版本。
+	return "0.1.0"
 }

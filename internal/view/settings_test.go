@@ -108,3 +108,23 @@ func TestPageTransition(t *testing.T) {
 		t.Errorf("关闭动效后应立即到位，实际 %.3f", k)
 	}
 }
+
+// TestViewTransition 主题页两个视图切换：0.18 秒淡入，关动效直接到位。
+func TestViewTransition(t *testing.T) {
+	base := time.Now()
+	a := NewApp()
+	a.clock = func() time.Time { return base }
+	a.viewAt = base.Add(-90 * time.Millisecond)
+	if k := a.viewProgress(base); k <= 0.05 || k >= 0.95 {
+		t.Errorf("0.09s 时视图应淡入到一半，实际 k=%.3f", k)
+	}
+	a.viewAt = base.Add(-time.Second)
+	if k := a.viewProgress(base); k != 1 {
+		t.Errorf("1s 后应到 1，实际 %.3f", k)
+	}
+	a.settings.Animations = false
+	a.viewAt = base
+	if k := a.viewProgress(base); k != 1 {
+		t.Errorf("关闭动效后应立即到位，实际 %.3f", k)
+	}
+}
