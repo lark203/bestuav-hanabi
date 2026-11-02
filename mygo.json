@@ -6,5 +6,6 @@
   "publisher": "BestUAV",
   "copyright": "Copyright © 2026 BestUAV",
   "out": "build",
+  "icon": "assets/icon.png",
   "resources": ["assets"]
 }
