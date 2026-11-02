@@ -223,9 +223,9 @@ Read and write → Save**（默认只读时 `gh release create/upload` 会 403�
 发布流程：
 
 ```bash
-# mygo.json 的 version 与 tag 必须一致，例如 0.1.0 / v0.1.0
-git tag v0.1.0
-git push github v0.1.0
+# mygo.json 的 version 与 tag 必须一致，例如 0.1.1 / v0.1.1
+git tag v0.1.1
+git push github v0.1.1
 ```
 
 只有推 GitHub 的 tag 会触发 CI；推 AtomGit 不会。在 Actions 里等三个平台跑完，
