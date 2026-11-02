@@ -218,26 +218,6 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 	})
 }
 
-// motifName 是标识画法的中文说明。
-func motifName(m theme.Motif) string {
-	switch m {
-	case theme.MotifFlame:
-		return "焰火标识"
-	case theme.MotifBolt:
-		return "雷光标识"
-	case theme.MotifGeo:
-		return "岩印标识"
-	case theme.MotifLeaf:
-		return "草叶标识"
-	case theme.MotifWave:
-		return "水珠标识"
-	case theme.MotifWind:
-		return "风纹标识"
-	default:
-		return "冰晶标识"
-	}
-}
-
 // placeholderPage 尚未实现的页面。
 func (a *App) placeholderPage(c *ui.Context) {
 	title := "未命名"

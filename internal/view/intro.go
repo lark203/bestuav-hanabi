@@ -378,8 +378,11 @@ func drawGeoMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float
 }
 
 // drawIntroBrand 右下角的 "HANABI" 字标：逐字绘制以做出字距。
+//
+// fade 已经是整层的淡出（Intro.Opacity），这里不能再乘一次 in.Opacity()：
+// 那会让品牌字按不透明度的平方衰减，比其它元素早得多地消失（踩过）。
 func drawIntroBrand(p *ui.Painter, r ui.Rect, in *intro.Intro, fade float32) {
-	reveal := intro.Smooth(in.T, 0.45, 1.25) * (1 - intro.Smooth(in.T, 4.90, 5.70)) * in.Opacity() * fade
+	reveal := intro.Smooth(in.T, 0.45, 1.25) * (1 - intro.Smooth(in.T, 4.90, 5.70)) * fade
 	if reveal <= 0.01 {
 		return
 	}

@@ -246,7 +246,7 @@ var all = []Character{
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
-		Motto: "琉焰华舞", Scene: "稻妻 · 夏祭", SceneEN: "FIREFWORKS AT DUSK",
+		Motto: "琉焰华舞", Scene: "稻妻 · 夏祭", SceneEN: "FIREWORKS AT DUSK",
 		Element: Pyro, Motif: MotifFlame, WallTint: 0.18, Scrim: 0.47,
 		CardBg: ui.Hex("#3E2418"), Art: ArtFirework,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
@@ -282,7 +282,7 @@ var all = []Character{
 	},
 	{
 		// 钟离的壁纸原项目只有 .hbw 打包格式，这里是从中提取图层合成出的静态图
-		// （金色渐变 + 岩印 + 立绘 + 沙漠）。色彩本身很亮，压暗给到 0.46。
+		// （金色渐变 + 岩印 + 立绘 + 沙漠）。色彩本身很亮，压暗给到 0.62。
 		ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Epithet: "岩契",
 		Motto: "尘世闲游", Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
 		Element: Geo, Motif: MotifGeo, WallTint: 0.18, Scrim: 0.62,

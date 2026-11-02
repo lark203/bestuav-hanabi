@@ -89,7 +89,7 @@ func (a *App) setCharacter(id string) {
 	}
 	a.char = c
 	a.tok = c.Tok
-	// 释放上一套的壁纸/头像/动态遮罩像素：每张 4K 约 33MB，六套全留着会到 200MB。
+	// 释放上一套的壁纸/头像/动态遮罩像素：每张 4K 约 33MB，七套全留着会到 200MB。
 	keep := []string{c.Bg, c.Icon}
 	for _, p := range []string{c.PersonMask, c.HairVeil, c.HairWave} {
 		if p != "" {
@@ -163,6 +163,15 @@ func (a *App) View(c *ui.Context) {
 		}
 		ov := ui.Box(c).Absolute().Fill()
 		ov.Draw(func(p *ui.Painter, r ui.Rect) { a.introLayer(p, r) })
+		// 跳过：点画面任意处或按 Esc。交给 Intro.Skip 用 0.9 秒快进走完，
+		// 不硬切——硬切会让标识瞬间消失、品牌位再突然亮起。
+		//
+		// 覆盖层本身已经接住了指针（全屏 Box），此前的问题是没人读这次点击，
+		// 所以 Skip() 永远调不到，表现就是「点了没反应」。键盘不受 Box 影响，
+		// Esc 单独接。
+		if a.intro != nil && (ov.Clicked() || c.Shortcut(0, ui.KeyEscape)) {
+			a.intro.Skip()
+		}
 	}
 }
 
