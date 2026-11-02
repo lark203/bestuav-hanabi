@@ -201,9 +201,9 @@ go tool mygo build -upload
 
 ## 自动构建（GitHub Actions）
 
-`.github/workflows/release.yml` 在推送 `v*` tag 时创建 draft release，并行构建
-Windows / Linux / macOS 并上传安装包、更新压缩包和 manifest。原生 UI 不需要
-Bun，Windows 安装包在 Ubuntu runner 上装 NSIS 生成。
+`.github/workflows/release.yml` 在推送 `v*` tag 时创建 draft release，按
+Windows / macOS / Linux 三个 runner 串行构建并上传安装包、更新压缩包和 manifest。
+原生 UI 不需要 Bun；Windows 安装包在 Windows runner 上生成。
 
 **必须配置的 secret**：
 
@@ -215,6 +215,9 @@ gh secret set MYGO_UPDATER_PRIVATE_KEY < D:/workbuddy/bestuav-hanabi-update-keys
 `GH_TOKEN` 由 workflow 的 `github.token` 提供，不需要手动配置；`permissions.contents: write`
 已经写在 workflow 里。**不要把私钥提交到仓库**。
 
+GitHub 仓库还需要打开写权限：**Settings → Actions → General → Workflow permissions →
+Read and write → Save**（默认只读时 `gh release create/upload` 会 403）。
+
 发布流程：
 
 ```bash
@@ -223,8 +226,22 @@ git tag v0.1.0
 git push github v0.1.0
 ```
 
-然后在 GitHub 的 Actions 里等三个平台跑完，检查 draft release 并发布。发布后
-旧版本就能自动更新。
+只有推 GitHub 的 tag 会触发 CI；推 AtomGit 不会。在 Actions 里等三个平台跑完，
+检查 draft release 并发布。发布后旧版本就能自动更新。
+
+### 本机推送与代理
+
+本机 WorkBuddy 会注入 `HTTP_PROXY=127.0.0.1:5437`，它会拦 `github.com`；
+按 bestuav-mygo 的记录，给 github.com 单独走 Clash 的 7890：
+
+```bash
+git config --global http.https://github.com.proxy http://127.0.0.1:7890
+git remote add github https://github.com/lark203/bestuav-hanabi.git
+git push github main dev
+```
+
+回滚：`git config --global --unset http.https://github.com.proxy`。
+凭证沿用本机 Git Credential Manager 里 bestuav-mygo 同一套 GitHub 凭证即可。
 
 可选、当前**没有配置**的签名：
 
