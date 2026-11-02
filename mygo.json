@@ -2,7 +2,7 @@
   "name": "花火",
   "slug": "hanabi",
   "identifier": "com.bestuav.hanabi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "BestUAV",
   "copyright": "Copyright © 2026 BestUAV",
   "out": "build",

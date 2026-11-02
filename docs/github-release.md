@@ -19,11 +19,15 @@
   }
   ```
 
-- 还差一个 **Repository secret**：`MYGO_UPDATER_PRIVATE_KEY`。
+- **v0.1.0 已发布**，Actions 的三平台构建全部成功；资产包含 Windows 安装包、
+  macOS dmg、Linux deb/tar.gz、各平台 `update-*.json`。
+- 代码已 bump 到 **0.1.1**（全屏修复版本），tag `v0.1.1` 尚未推送。
+- `MYGO_UPDATER_PRIVATE_KEY` 已配置。换仓库/重建时要重新配置。
+- **注意**：v0.1.0 的构建时间早于「全屏开场不居中」修复；要拿到修复必须发 0.1.1。
 
-## 1. 添加更新签名私钥。
+## 1. 配置更新签名私钥（已配置）
 
-打开：
+如果换仓库或重新配置，打开：
 
 `Settings → Secrets and variables → Actions → New repository secret`
 
@@ -38,13 +42,13 @@
 
 ## 2. 推送 tag 触发构建
 
-`mygo.json` 的版本必须和 tag 一致。当前版本是 `0.1.0`：
+`mygo.json` 的版本必须和 tag 一致。当前已经是 `0.1.1`：
 
 ```powershell
 cd D:\workbuddy\bestuav-hanabi
 git checkout main
-git tag v0.1.0
-git push github v0.1.0
+git tag v0.1.1
+git push github v0.1.1
 ```
 
 只有推 GitHub 的 tag 会触发 CI，推 AtomGit 不会。
@@ -52,10 +56,10 @@ git push github v0.1.0
 如果 tag 已存在：
 
 ```powershell
-git tag -d v0.1.0
-git push github :refs/tags/v0.1.0
-git tag v0.1.0
-git push github v0.1.0
+git tag -d v0.1.1
+git push github :refs/tags/v0.1.1
+git tag v0.1.1
+git push github v0.1.1
 ```
 
 ## 3. 等 Actions 完成
@@ -75,14 +79,14 @@ Windows 安装包在 Windows runner 上生成；macOS 是 `darwin/universal`；L
 
 <https://github.com/lark203/bestuav-hanabi/releases>
 
-打开 `v0.1.0` draft，检查资产，点 **Publish release**。建议勾选
+打开 `v0.1.1` draft，检查资产，点 **Publish release**。建议勾选
 **Set as latest release**。draft 对客户端不可见，必须发布后自动更新才能查到。
 
 ## 5. 验证自动更新
 
 1. 用 CI 产出的 `hanabi-setup-0.1.0-amd64.exe` 安装 0.1.0。
    **不要用 owner 改成 `lark203` 之前的本地 `build/` 包**，那个包链的是旧地址。
-2. 把 `mygo.json` 的 `version` 改成 `0.1.1`，提交。
+2. 确认 `mygo.json` 的 `version` 是 `0.1.1`（已 bump），提交。
 3. 打 tag 并推送：
    ```powershell
    git tag v0.1.1
