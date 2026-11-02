@@ -149,13 +149,20 @@ func (a *App) filterChip(c *ui.Context, label string, on bool, onClick func()) {
 	})
 }
 
-// characterCard 单张角色卡片：纯色底 + 右侧专属线稿，左上角元素标识，
-// 中间英文名，底部「中文名·属性」；当前主题加元素色描边。
+// characterCard 单张角色卡片：纯色底 + 专属线稿，元素标识，中间英文名，
+// 底部「中文名·属性」；当前主题加元素色描边。
+//
+// 两种画法：
+//   - 通用卡：左上小徽记 + 右侧 cardArt 线稿；
+//   - 清心纹卡（甘雨）：按参考图把元素徽记放大放在 (36,31)，右上清心花、
+//     三条风纹横贯卡面、右缘挂淡金中国结。徽记因此不占布局（它被 Spacer
+//     顶到底部，英文名位置不变）。
 //
 // 为什么不用壁纸缩略图：一张 4K 插画缩到 246×142 只剩一团色块，
 // 七张并排时彼此难分；纯色 + 线稿既保证一排卡片色彩分明，也让每张有图形记忆点。
 func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 	active := ch.ID == a.char.ID
+	qingxinCard := ch.Ornament == theme.OrnamentQingxin
 
 	card := ui.Column(c).Width(cardW).Height(142).Padding(15, 14).
 		Radius(a.tok.Radius).Border(1, ui.RGBA(255, 255, 255, 0.10)).
@@ -172,9 +179,23 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 		// 是「卡片是实体」这个质感的重要来源。
 		p.Fill(ui.Rect{X: r.X + 1, Y: r.Y + 1, W: r.W - 2, H: 1},
 			ui.RGBA(255, 255, 255, 0.16), 0)
-		// 右侧是装饰线稿（cardArt），与左上的元素徽记是两个不同的图标——
-		// 原版设计如此：徽记点元素，线稿给每张卡片各自的记忆点。
+
 		p.Clip(r, a.tok.Radius, func() {
+			if qingxinCard {
+				// 清心纹卡：风纹在底，花与结在上，元素徽记再压一层。
+				windLines(p, r)
+				t := float32(p.Now().Sub(a.t0).Seconds())
+				qingxin(p, r.X+r.W-81, r.Y+57, 36,
+					ui.RGBA(176, 223, 236, .35),
+					-.3+.025*sinf(float64(t)*.25))
+				chineseKnot(p, r.X+r.W-29, r.Y+12, 1, t)
+				// 参考图的冰元素徽记在卡片内 (36,31)、半径 17，带一层浅辉光。
+				cx, cy := r.X+36, r.Y+31
+				glow(p, cx, cy, 34, ch.Tok.Accent, .22)
+				glyph(p, ch.Motif, cx, cy, 17, ch.Tok.Accent, .95, 0)
+				return
+			}
+			// 通用卡：右侧是装饰线稿（cardArt），与左上的元素徽记是两个不同的图标。
 			cardArt(p, ch.Art, ui.Rect{X: r.X + r.W*0.38, Y: r.Y, W: r.W * 0.66, H: r.H},
 				ch.Tok.Accent)
 		})
@@ -191,21 +212,31 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 	}
 
 	card.Children(func() {
-		// 左上：元素标识（小尺寸，不抢英文名）
-		ui.Row(c).Width(22).Height(22).Draw(func(p *ui.Painter, r ui.Rect) {
-			glyph(p, ch.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.40,
-				ch.Tok.Accent, 0.95, 0)
-		})
-
-		ui.Spacer(c)
+		// 通用卡的左上角小徽记；清心纹卡的徽记已画在卡片内，不占布局。
+		if !qingxinCard {
+			ui.Row(c).Width(22).Height(22).Draw(func(p *ui.Painter, r ui.Rect) {
+				glyph(p, ch.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.40,
+					ch.Tok.Accent, 0.95, 0)
+			})
+			// 徽记 22 + 18 = 40，让英文名从卡片顶部 15+40=55 开始（参考图 y+55）。
+			ui.Row(c).Height(18)
+		} else {
+			// 清心纹卡没有布局里的小徽记，用 40 的固定空档对齐同一个基线。
+			ui.Row(c).Height(40)
+		}
 
 		ui.Text(c, ch.NameEN).FontSize(26).
 			Font("Georgia, Cambria, 'Times New Roman', serif").
-			TextColor(ui.Hex("#F4F7FA"))
+			TextColor(ui.RGBA(255, 248, 235, .94))
+
+		// 名字与短句之间留白，短句贴卡片底（参考图 name y+55 / caption y+116）。
+		ui.Spacer(c)
+
 		// 对勾徽章贴卡片最右边（参考图位置）：文字 Grow(1) 顶开。
 		ui.Row(c).AlignItems(ui.Center).Gap(7).Children(func() {
-			ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(11).
-				TextColor(ui.RGBA(255, 255, 255, 0.60)).Grow(1)
+			// 参考图里角色短句用元素色，不是纯白——元素感主要来自这行小字。
+			ui.Text(c, ch.NameCN+" · "+ch.Epithet).FontSize(12).
+				TextColor(ch.Tok.Accent.Alpha(0.92)).Grow(1)
 			if active {
 				ui.Row(c).Width(16).Height(16).Draw(func(p *ui.Painter, r ui.Rect) {
 					cx, cy := r.X+r.W/2, r.Y+r.H/2

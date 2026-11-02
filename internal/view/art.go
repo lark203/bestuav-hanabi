@@ -101,6 +101,9 @@ func cardArt(p *ui.Painter, art theme.Art, r ui.Rect, accent ui.Color) {
 	const w = float32(1.15)
 
 	switch art {
+	case theme.ArtNone:
+		// 由 Ornament 的专属纹样接管（清心纹 / 风纹 / 中国结）。
+		return
 	case theme.ArtSakura:
 		artSakura(p, r, w, ink, faint, hot)
 	case theme.ArtFirework:

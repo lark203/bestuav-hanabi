@@ -2,6 +2,7 @@
 package view
 
 import (
+	"math"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -188,10 +189,15 @@ func (a *App) elementMark(c *ui.Context, size float32) {
 }
 
 // elementMarkSoft 底部的大标识：参考图里是一枚很淡的花形线稿，
-// 不抢戏——只有淡淡的辉光和半透明线条。
+// 不抢戏——只有淡淡的辉光和半透明线条。带纹样的主题（甘雨）换成清心纹，
+// 参考项目侧栏底部画的正是同一朵花。
 func (a *App) elementMarkSoft(c *ui.Context, size float32) {
 	ui.Row(c).Width(size).Height(size).Draw(func(p *ui.Painter, r ui.Rect) {
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
+		if a.char.Ornament == theme.OrnamentQingxin {
+			qingxin(p, cx, cy, size*0.45, ui.RGBA(188, 218, 232, .35), -math.Pi/2)
+			return
+		}
 		glow(p, cx, cy, size*0.52, a.tok.Accent, 0.22)
 		glyph(p, a.char.Motif, cx, cy, size*0.38, a.tok.Text, 0.55, 0)
 	})
@@ -262,8 +268,13 @@ func (a *App) navRow(c *ui.Context, id, label string, icon *ui.SVG) {
 		ui.Icon(c, icon).FontSize(17).TextColor(color)
 		ui.Text(c, label).FontSize(13).TextColor(color).Grow(1)
 		if active {
-			ui.Row(c).Width(15).Height(15).Draw(func(p *ui.Painter, r ui.Rect) {
-				glyph(p, a.char.Motif, r.X+r.W/2, r.Y+r.H/2, r.W*0.44, a.tok.Accent, 0.85, 0)
+			ui.Row(c).Width(18).Height(18).Draw(func(p *ui.Painter, r ui.Rect) {
+				cx, cy := r.X+r.W/2, r.Y+r.H/2
+				if a.char.Ornament == theme.OrnamentQingxin {
+					qingxin(p, cx, cy, r.W*0.50, a.tok.Accent.Alpha(.5), 0)
+					return
+				}
+				glyph(p, a.char.Motif, cx, cy, r.W*0.44, a.tok.Accent, 0.85, 0)
 			})
 		}
 	})
@@ -277,12 +288,12 @@ func (a *App) titlebar(c *ui.Context) {
 	bar := ui.Row(c).Height(40).Padding(0, 10).AlignItems(ui.Center).Gap(4)
 	bar.Children(func() {
 		ui.Spacer(c)
-		a.winButton(c, icons.Minimize, "最小化", func() {
+		a.winButton(c, 0, icons.Minimize, "最小化", func() {
 			if a.win != nil {
 				a.win.Minimize()
 			}
-		}, false)
-		a.winButton(c, icons.Maximize, "最大化 / 还原", func() {
+		})
+		a.winButton(c, 1, icons.Maximize, "最大化 / 还原", func() {
 			if a.win == nil {
 				return
 			}
@@ -291,55 +302,150 @@ func (a *App) titlebar(c *ui.Context) {
 			} else {
 				a.win.Maximize()
 			}
-		}, false)
-		a.winButton(c, icons.Close, "关闭", func() {
+		})
+		a.winButton(c, 2, icons.Close, "关闭", func() {
 			if a.win != nil {
 				a.win.Close()
 			}
-		}, true)
+		})
 	})
 	bar.DragWindow()
 
-	// 标题栏中间的工作室小标：用 DrawOver 精确居中，
-	// 不影响左右两端的布局（右侧是窗口按钮）。
+	// 顶栏正中是当前角色的命之座拉丁名（参考项目 DrawChrome 的 text.constellation）。
+	// 注意要按「整个窗口」居中，而不是标题栏（它从侧栏右边开始）居中——
+	// HanaBi 字样只留在状态栏，不再和命之座抢中间。
 	bar.DrawOver(func(p *ui.Painter, r ui.Rect) {
-		const label = "HANABI / STUDIO"
-		w, h := p.MeasureText(0, ui.Span{Text: label, Size: 9})
-		p.Text(r.X+(r.W-w)/2, r.Y+(r.H-h)/2, label, 9, a.tok.TextFaint)
+		label := a.char.Constellation
+		if label == "" {
+			return
+		}
+		w, _ := c.Size()
+		tw, th := p.MeasureText(0, ui.Span{Text: label, Size: 9})
+		p.Text(w/2-tw/2, r.Y+(r.H-th)/2, label, 9, a.tok.TextFaint.Alpha(.85))
 	})
 }
 
 // winButton 是一个窗口控件按钮：悬停变亮，点击执行 action。
 //
-// warn=true 时（仅关闭按钮）走"警告色"分支：悬停染成主题警告红玫色，
-// 图标也转成同色——与最小化/最大化区分开，提醒这是破坏性操作。
-// 参考项目 HanaBi-ui-Genshin 正是给关闭按钮（index 2）单独染玫红。
+// idx=2 是关闭按钮，走「警告色」分支：悬停染成主题警告红玫色，图标也转成
+// 同色——与最小化/最大化区分开。参考项目正是给关闭按钮单独染玫红。
 //
-// 图标用 SVG 而不是 "—" "□" "✕" 这些字符：字体里不一定有这些字形，
-// 缺字形时按钮会变成一个空方块（试过）。
-func (a *App) winButton(c *ui.Context, icon *ui.SVG, tip string, action func(), warn bool) {
-	btn := ui.Row(c).Width(32).Height(26).Radius(6).
+// 造型按主题的 Chrome 分发：
+//   - ChromePlain：圆角按钮 + SVG 图标。图标不用 "—" "□" "✕" 这些字符，
+//     字体里不一定有这些字形，缺字形时按钮会变成一个空方块（试过）。
+//   - ChromeCrystal：冰晶切角八边形 + 淡金线 + 冰晶化的三个图标（甘雨）。
+//
+// 悬停用 140ms 的补间而不是瞬变：参考项目这里是弹簧，颜色要跟着走。
+func (a *App) winButton(c *ui.Context, idx int, icon *ui.SVG, tip string, action func()) {
+	warn := idx == 2
+	btn := ui.Row(c).Width(36).Height(28).Radius(6).
 		AlignItems(ui.Center).Justify(ui.Center)
 	hovered := btn.Hovered()
+	target := float32(0)
 	if hovered {
-		if warn {
-			// 警告色提醒：破坏性操作，悬停时背景与图标都染成主题警告红。
-			btn.Background(a.tok.Danger.Alpha(0.22))
-		} else {
-			btn.Background(ui.RGBA(255, 255, 255, 0.16))
-		}
+		target = 1
 	}
+	hv := btn.AnimateTo("hover", target,
+		ui.Animation{Duration: 140 * time.Millisecond, Ease: ui.EaseOut})
 	btn.Tooltip(tip)
 	if btn.Clicked() {
 		action()
 	}
+
+	if a.char.Chrome == theme.ChromeCrystal {
+		btn.Draw(func(p *ui.Painter, r ui.Rect) { a.crystalButton(p, r, idx, hv) })
+		return
+	}
+
+	if hv > 0.002 {
+		if warn {
+			// 警告色提醒：破坏性操作，悬停时背景与图标都染成主题警告红。
+			btn.Background(a.tok.Danger.Alpha(0.22 * hv))
+		} else {
+			btn.Background(ui.RGBA(255, 255, 255, 0.16*hv))
+		}
+	}
 	btn.Children(func() {
 		col := a.tok.Text
-		if warn && hovered {
-			col = a.tok.Danger
+		if warn {
+			col = a.tok.Text.Mix(a.tok.Danger, hv)
 		}
 		ui.Icon(c, icon).FontSize(16).TextColor(col)
 	})
+}
+
+// crystalButton 画甘雨的窗口按钮：八边形冰晶切角 + 顶部淡金线 + 冰晶化图标。
+//
+// 几何照参考 ganyu_ui.cpp::WindowControl：中心、半宽 13、切角 5
+// （按钮 36×28，八边形 26×26）。三个图标的画法：
+// 最小化是一横 + 菱形箭头，最大化是菱形轮廓 + 中心点，关闭是叉 + 小圆环。
+func (a *App) crystalButton(p *ui.Painter, r ui.Rect, idx int, hv float32) {
+	cx, cy := r.X+r.W/2, r.Y+r.H/2
+	half := min32(r.W, r.H)*0.5 - 1
+	cut := half * 0.38
+
+	pts := octagonPoints(cx, cy, half, cut)
+	// 冰蓝底：悬停时更实一点，切角才有"水晶块"的体积感。
+	p.FillPath(octagonFrom(pts), ui.RGBA(12, 37, 57, .29+.22*hv))
+
+	base := ui.RGBA(151, 219, 240, 1)
+	hot := ui.RGBA(220, 238, 249, 1)
+	if idx == 2 {
+		// 关闭是破坏性操作：悬停从冰蓝过渡到玫红。
+		hot = ui.RGBA(223, 140, 159, 1)
+	}
+	tint := base.Mix(hot, hv)
+
+	// 顶部切面：一条极淡的高光三角，让切角面读起来有折射。
+	var facet ui.Path
+	facet.MoveTo(pts[0][0], pts[0][1])
+	facet.LineTo(pts[1][0], pts[1][1])
+	facet.LineTo(cx, cy-2)
+	facet.Close()
+	p.FillPath(&facet, tint.Alpha(.07))
+
+	// 轮廓与顶部金线。
+	p.StrokePath(octagonFrom(pts), .8, tint.Alpha(.30+.50*hv))
+	var edge ui.Path
+	edge.MoveTo(pts[0][0], pts[0][1])
+	edge.LineTo(pts[1][0], pts[1][1])
+	p.StrokePath(&edge, .8, ui.RGBA(218, 191, 137, .31+.35*hv))
+
+	col := tint
+	z := float32(4.5)
+	switch idx {
+	case 0: // 最小化：一横 + 小菱形箭头
+		var line ui.Path
+		line.MoveTo(cx-z, cy)
+		line.LineTo(cx+z, cy)
+		p.StrokePath(&line, 1.1, col)
+		var arrow ui.Path
+		arrow.MoveTo(cx+z+1, cy-2)
+		arrow.LineTo(cx+z+3, cy)
+		arrow.LineTo(cx+z+1, cy+2)
+		arrow.LineTo(cx+z-1, cy)
+		arrow.Close()
+		p.FillPath(&arrow, col)
+	case 1: // 最大化：菱形轮廓 + 中心点
+		var d ui.Path
+		d.MoveTo(cx, cy-z-1)
+		d.LineTo(cx+z+1, cy)
+		d.LineTo(cx, cy+z+1)
+		d.LineTo(cx-z-1, cy)
+		d.Close()
+		p.StrokePath(&d, 1.1, col)
+		circle(p, cx, cy, 1, col)
+	case 2: // 关闭：叉 + 小圆环
+		var x ui.Path
+		x.MoveTo(cx-z, cy-z)
+		x.LineTo(cx+z, cy+z)
+		x.MoveTo(cx-z, cy+z)
+		x.LineTo(cx+z, cy-z)
+		p.StrokePath(&x, 1.2, col)
+		var ring ui.Path
+		ring.Circle(cx, cy, 1.7)
+		p.StrokePath(&ring, .7, col)
+	}
 }
 
 // content 内容区：按当前页分发。
@@ -350,6 +456,11 @@ func (a *App) content(c *ui.Context) {
 	ui.Column(c).Grow(1).Clip().
 		Draw(func(p *ui.Painter, r ui.Rect) {
 			p.Fill(r, ui.RGBA(6, 11, 18, 0.28), 0)
+			// 甘雨：内容区右下角一枚很大的淡清心纹（参考 ganyu_ui.cpp::Chrome）。
+			// 画在暗色底之后、页面之前，所以它垫在卡片与文字下面。
+			if a.char.Ornament == theme.OrnamentQingxin {
+				qingxin(p, r.X+r.W-45, r.Y+r.H-40, 61, ui.RGBA(176, 217, 235, .11), .1)
+			}
 		}).
 		Children(func() {
 			// Grow(1) 必须加：Scroll 只在「父容器高度有界」时才滚动——

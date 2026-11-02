@@ -102,6 +102,31 @@ const (
 	ArtCrystal
 	// ArtRing 岩环 + 六方。
 	ArtRing
+	// ArtNone 表示这张卡片由 Ornament 的专属纹样接管，不再画通用线稿。
+	ArtNone
+)
+
+// Chrome 是窗口按钮（最小化 / 最大化 / 关闭）的造型。
+//
+// 参考项目每个角色都有一套和服饰、元素匹配的窗口按钮；这里按主题声明，
+// 绘制层只按枚举分支，不认角色名。
+type Chrome uint8
+
+const (
+	// ChromePlain 是通用造型：圆角按钮 + SVG 图标。
+	ChromePlain Chrome = iota
+	// ChromeCrystal 是冰晶切角：八边形切角 + 淡金线 + 冰晶化的三个图标（甘雨）。
+	ChromeCrystal
+)
+
+// Ornament 是侧栏、卡片与内容区上的角色专属纹样。
+type Ornament uint8
+
+const (
+	// OrnamentNone 只有统一的元素标识。
+	OrnamentNone Ornament = iota
+	// OrnamentQingxin 是璃月的清心纹 + 中国结 + 风纹（甘雨）。
+	OrnamentQingxin
 )
 
 // Tokens 是一套角色主题的调色板。
@@ -131,14 +156,21 @@ type Character struct {
 	NameEN string
 	// Epithet 是卡片上的属性词，如「甘雨·循霜」里的「循霜」。
 	Epithet string
-	// Motto 是侧栏品牌区副标题（随主题切换，参考图里是「瑞霜而行」）。
+	// Motto 是侧栏品牌区副标题（随主题切换，参考图里是「循霜而行」）。
 	Motto string
+	// Constellation 是顶栏中央的命之座拉丁名，如甘雨的
+	// 「S I N U S   U N I C O R N I S」。参考项目把它放在窗口正中，
+	// HanaBi 字样只留在状态栏；空表示不画。
+	Constellation string
 	// Scene / SceneEN 是侧栏底部的场景名（参考图里的「璃月 · 海灯夜 / A QUIET MOMENT」）。
 	Scene   string
 	SceneEN string
 	Element Element
 	Motif   Motif
-	Tok     Tokens
+	// Chrome 决定三个窗口按钮的造型；Ornament 决定侧栏、卡片上的角色纹样。
+	Chrome   Chrome
+	Ornament Ornament
+	Tok      Tokens
 
 	// CardBg 是主题卡片的纯色底。每张卡片一块纯色，选中时加元素色描边。
 	CardBg ui.Color
@@ -222,9 +254,11 @@ func derive(accent ui.Color) Tokens {
 var all = []Character{
 	{
 		ID: "ganyu", NameCN: "甘雨", NameEN: "Ganyu", Epithet: "循霜",
-		Motto: "瑞霜而行", Scene: "璃月 · 海灯夜", SceneEN: "A QUIET MOMENT",
-		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
-		CardBg: ui.Hex("#14314A"), Art: ArtBlossom,
+		Motto: "循霜而行", Constellation: "S I N U S   U N I C O R N I S",
+		Scene: "璃月 · 海灯夜", SceneEN: "A QUIET MOMENT",
+		Element: Cryo, Motif: MotifCrystal, Chrome: ChromeCrystal, Ornament: OrnamentQingxin,
+		WallTint: 0.15, Scrim: 0.32,
+		CardBg: ui.Hex("#14314A"), Art: ArtNone,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
 		// 甘雨壁纸动态，分两层机制：
 		//
@@ -246,14 +280,16 @@ var all = []Character{
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
-		Motto: "琉焰华舞", Scene: "稻妻 · 夏祭", SceneEN: "FIREWORKS AT DUSK",
+		Motto: "琉焰华舞", Constellation: "C A R A S S I U S   A U R A T U S",
+		Scene: "稻妻 · 夏祭", SceneEN: "FIREWORKS AT DUSK",
 		Element: Pyro, Motif: MotifFlame, WallTint: 0.18, Scrim: 0.47,
 		CardBg: ui.Hex("#3E2418"), Art: ArtFirework,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
 	},
 	{
 		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko", Epithet: "神樱",
-		Motto: "浮世笑百姿", Scene: "鸣神 · 神樱", SceneEN: "SACRED SAKURA",
+		Motto: "浮世笑百姿", Constellation: "D I V I N A   V U L P E S",
+		Scene: "鸣神 · 神樱", SceneEN: "SACRED SAKURA",
 		Element: Electro, Motif: MotifBolt, WallTint: 0.15, Scrim: 0.66,
 		CardBg: ui.Hex("#37203F"), Art: ArtSakura,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
@@ -261,21 +297,24 @@ var all = []Character{
 	// 以下角色有自己的壁纸与专属 Motif（草叶 / 水滴 / 风纹）。
 	{
 		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Epithet: "新芽",
-		Motto: "白草净华", Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
+		Motto: "白草净华", Constellation: "S A P I E N T I A   O R O M A S D I S",
+		Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
 		Element: Dendro, Motif: MotifLeaf, WallTint: 0.15, Scrim: 0.66,
 		CardBg: ui.Hex("#1F3A22"), Art: ArtLeaf,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
 	},
 	{
 		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
-		Motto: "不休独舞", Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
+		Motto: "不休独舞", Constellation: "A N I M U L A   C H O R A G I",
+		Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
 		Element: Hydro, Motif: MotifWave, WallTint: 0.14, Scrim: 0.35,
 		CardBg: ui.Hex("#15294A"), Art: ArtSail,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
 	},
 	{
 		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
-		Motto: "百巧千机", Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
+		Motto: "百巧千机", Constellation: "F L O S C U L I   I M P L E X I",
+		Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
 		Element: Anemo, Motif: MotifWind, WallTint: 0.16, Scrim: 0.47,
 		CardBg: ui.Hex("#17342F"), Art: ArtCrystal,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
@@ -284,7 +323,8 @@ var all = []Character{
 		// 钟离的壁纸原项目只有 .hbw 打包格式，这里是从中提取图层合成出的静态图
 		// （金色渐变 + 岩印 + 立绘 + 沙漠）。色彩本身很亮，压暗给到 0.62。
 		ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Epithet: "岩契",
-		Motto: "尘世闲游", Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
+		Motto: "尘世闲游", Constellation: "L A P I S   D E I",
+		Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
 		Element: Geo, Motif: MotifGeo, WallTint: 0.18, Scrim: 0.62,
 		CardBg: ui.Hex("#392C14"), Art: ArtRing,
 		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),
