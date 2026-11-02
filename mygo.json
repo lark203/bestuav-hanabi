@@ -7,5 +7,9 @@
   "copyright": "Copyright © 2026 BestUAV",
   "out": "build",
   "icon": "assets/icon.png",
-  "resources": ["assets"]
+  "resources": ["assets"],
+  "updates": {
+    "publicKey": "n4yhUrKZdyX4iorEdCf4Z6o6Oqu9wx3YoHV9s7RqhlQ=",
+    "url": "https://atomgit.com/bestuav/bestuav-hanabi/releases/latest/download"
+  }
 }

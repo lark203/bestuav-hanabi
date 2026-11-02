@@ -3,7 +3,7 @@
 以角色主题为核心的桌面 UI，用 Go + [mygo](https://github.com/egoist/mygo) 实现。
 视觉与交互参考开源项目 [HanaBi-ui-Genshin](https://github.com/xiaoyeuzixi/HanaBi-ui-Genshin)（C++/ImGui 原生实现）。本项目是它的 Go 重写版本：**代码全部重写，只借鉴设计与交互**；壁纸素材由本地从原项目导入，不随仓库分发。
 
-## 当前阶段：多角色主题 + 开场动画 + 动态壁纸 + 设置与转场
+## 当前阶段：多角色主题 + 开场动画 + 动态壁纸 + 设置、转场与自动更新
 
 已完成：
 
@@ -66,7 +66,8 @@
     - **下次启动**：跟随当前 / 指定主题 / 随机角色；指定时用一排可换行的角色胶囊，随机不含黑白主题
     - 设置写在 `PathUserData/settings.json`（原子替换）；拖动类改动 300ms 防抖，退出时再 `FlushSettings`
 - **通用设置页**：侧栏「设置」现在只放应用级内容，不再和主题页抢同一页：
-  - **版本与更新**：当前版本（`mygo.App.Version()`），自动更新状态（打包与签名完成后接入）
+  - **版本与更新**：当前版本（`mygo.App.Version()`）；检查、下载、安装、重启的完整流程
+    （开发/测试构建显示未启用，不会联网）
   - **数据与存储**：`settings.json` 路径、复制路径、恢复默认设置
   - **关于**：参考项目链接与免责声明
 - **启动记忆**：`internal/settings` 负责默认值、夹取与 JSON 读写；`NewAppWithSettings` 在启动时
@@ -88,7 +89,8 @@
 - 标识的 3D 质感（原版是 5122 三角形 + 自定义顶点着色，这里是矢量近似）
 - 纳西妲 / 芙宁娜 / 珐露珊的**完整开场分镜**（殿堂、水上舞台、机关聚合）；目前是共享
   6.2 秒时间轴上的专属标识与粒子，不是参考项目的整段演出
-- 打包与自动更新
+- 发布：把 `build/windows-amd64/` 里的压缩包与 `update-windows-amd64.json` 上传到
+  `updates.url`（当前是 AtomGit latest 目录），自动更新才能端到端生效
 - 壁纸页按需求保持现状（占位）；黑白基础主题暂不做；最小化退场动画待定
 
 ## 预览
@@ -154,11 +156,40 @@ go run .
 go build ./...
 ```
 
+## 打包与自动更新
+
+`mygo.json` 的 `updates.publicKey` 是更新签名公钥，`updates.url` 是发布目录
+（当前指向 AtomGit 的 latest 下载目录）。私钥**不进仓库**，放在仓库外的
+`D:\workbuddy\bestuav-hanabi-update-keys\mygo-update.key`（或 CI secret），
+构建时通过 `MYGO_UPDATER_PRIVATE_KEY` 传入：
+
+```powershell
+$env:MYGO_UPDATER_PRIVATE_KEY = (Get-Content -Raw D:\workbuddy\bestuav-hanabi-update-keys\mygo-update.key).Trim()
+go tool mygo build
+# 或者
+.\scripts\build-release.ps1
+```
+
+产物在 `build/windows-amd64/`：`花火.exe`、`hanabi-<version>-windows-amd64.tar.gz`、
+`hanabi-setup-<version>-windows-amd64.exe`，以及 `update-windows-amd64.json`。
+把压缩包与 manifest 上传到 `updates.url` 指向的 release（文件名保持不变），
+已安装的旧版本就能在「设置 → 版本与更新」里检查、下载、安装并重启。
+
+- 自动更新的检查和安装都在 goroutine 里，UI 只读原子进度；开发/测试构建
+  `Updater.Enabled()=false`，不会联网。
+- `go tool mygo build` 在没有私钥时会跳过更新文件；发布版必须带私钥构建。
+- 当前 AtomGit 还没有 `v0.1.0` release，`mygo build` 计算 delta 时会读到网页而
+  给出 warning；发布 release 后该地址返回 manifest，warning 消失。首次发布可
+  先手动上传，或按 mygo 文档接 GitHub/S3。
+
 ## 目录
 
 ```text
 main.go                 启动：窗口 + Content
-mygo.json               打包配置（name/slug/version；resources 把 assets/ 复制到 exe 旁）
+mygo.json               打包配置（name/slug/version；resources 把 assets/ 复制到 exe 旁；
+                        updates 更新公钥与发布目录）
+CHANGELOG.md            发布说明（mygo build 写进 update manifest）
+scripts/build-release.ps1 带更新私钥的发布构建
 internal/theme/         角色包：令牌 + 元素 + 标识画法 + 壁纸染色强度
 internal/assets/        资源定位（resources 目录 / go.mod 锚点）+ 解码缓存
 internal/wallpaper/     wallpaper.kage + Draw：动态壁纸着色器
@@ -171,7 +202,8 @@ internal/view/          界面根：App 状态、开场渲染、侧栏、标题�
                         ornaments_ui.go：纹样在内容区/侧栏/导航/卡片上的排布
                         chrome.go：七个角色的窗口按钮造型
                         appearance.go：主题页的外观与启动视图
-                        settings_page.go：通用设置（版本/数据/关于）
+                        settings_page.go：通用设置（版本/更新、数据、关于）
+                        update.go：自动更新的检查/下载/安装状态机
 docs/screenshots/       界面截图（离屏渲染产出）
 ```
 
@@ -186,13 +218,13 @@ go test ./...          # 时间轴/粒子/姿态 + 开场渲染冒烟
 `internal/wallpaper` 钉住"时间推进会改变画面、`play=0` 时完全静止"。
 `internal/settings` 钉住默认值（112%、跟随当前）、越界夹取、坏 JSON 回退与读写往返。
 `internal/theme` 钉住每个角色的 Chrome / Ornament 配置。
-`internal/view` 另外钉住启动模式（跟随/固定/随机）、字号换算、主题过渡、页面入场与
-主题页视图切换的进度；离屏渲染仍是主要成本（`go test ./...` 约一分钟）。
+`internal/view` 另外钉住启动模式（跟随/固定/随机）、字号换算、主题过渡、页面入场、
+主题页视图切换与更新检查的文本/进度；离屏渲染仍是主要成本（`go test ./...` 约一分半）。
 
 ## 路线图
 
-1. **打包与自动更新**：沿用 mygo 的 `build`/`-upload` 与 Updater，把通用设置里的
-   “自动更新”接上检查、下载与安装
+1. **发布第一个 release**：把签名产物与 manifest 传到 AtomGit latest 目录，验证
+   「检查 → 下载 → 安装 → 重启」整条链路
 2. **可选**：纳西妲 / 芙宁娜 / 珐露珊的完整开场分镜、最小化退场动画、标识的 3D 质感
 3. 壁纸页保持现状；黑白基础主题不做
 

@@ -20,7 +20,7 @@ func (a *App) settingsPage(c *ui.Context) {
 				ui.Text(c, "PREFERENCES").FontSize(a.fs(9)).TextColor(a.tok.TextFaint).
 					Padding(0, 0, 4, 0)
 			})
-			ui.Text(c, "版本、数据与关于。").FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
+			ui.Text(c, "版本、更新、数据与关于。").FontSize(a.fs(12)).TextColor(a.tok.TextMuted)
 		})
 	})
 
@@ -41,10 +41,12 @@ func (a *App) versionPanel(c *ui.Context) {
 		ui.Spacer(c)
 
 		ui.Text(c, "自动更新").FontSize(a.fs(13)).TextColor(a.tok.Text)
-		ui.Text(c, "尚未配置：打包与签名完成后接入更新源。").
-			FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
-		ui.Text(c, "接入后这里会显示检查、下载与安装的进度。").
-			FontSize(a.fs(10)).TextColor(a.tok.TextFaint.Alpha(.8))
+		ui.Text(c, a.updateStatusLine()).FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
+		a.updateControls(c)
+		if !a.updateEnabled() {
+			ui.Text(c, "开发和测试构建不联网检查；发布构建会带着更新公钥与更新源。").
+				FontSize(a.fs(10)).TextColor(a.tok.TextFaint.Alpha(.8))
+		}
 	})
 }
 

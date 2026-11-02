@@ -72,6 +72,9 @@ type App struct {
 	introAt   time.Time
 	introDone bool
 	notify    func() // 仅用于开场结束时请求一次重建
+
+	// 自动更新的检查/安装状态；网络与文件操作在 update.go 里放到 goroutine。
+	upd updateState
 }
 
 // animFPS 是壁纸动效的重绘频率：这类缓慢漂移在这个帧率下已经连续。
@@ -126,6 +129,7 @@ func newApp(s settings.Settings, persist bool) *App {
 		viewAt:    time.Now().Add(-time.Hour), // 启动视图不做淡入
 		pageAt:    time.Now().Add(-time.Hour), // 启动页不做入场动画
 		introDone: !s.IntroPlay,
+		upd:       updateState{events: make(chan updateEvent, 4)},
 	}
 	a.settings.Theme = c.ID
 	if _, ok := theme.ByID(a.settings.Theme); !ok {
@@ -365,6 +369,7 @@ var (
 func (a *App) View(c *ui.Context) {
 	now := a.clock()
 	a.saveTick(c)
+	a.pollUpdate(c)
 
 	// 主题交叉淡入：a.tok 在旧、新两组令牌之间插值；壁纸用两层叠加，
 	// 新壁纸那一层的 Element.Opacity 会连着色器一起淡入（mygo 的 shader
