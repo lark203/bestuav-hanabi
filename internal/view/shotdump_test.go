@@ -61,14 +61,13 @@ func TestWriteShots(t *testing.T) {
 			continue
 		}
 		flow := a.wallpaperFlowFor(ch)
-		cam := framingOf(ch)
 		for _, tm := range []float64{0, 6} {
 			fx := tm
 			shot := ui.NewTester(func(c *ui.Context) {
 				ui.Column(c).Fill().Draw(func(p *ui.Painter, r ui.Rect) {
 					wallpaper.Draw(p, bg, r, wallpaper.Options{
 						Time: fx, Play: 1, Tint: ch.Tok.Accent, TintAmount: ch.WallTint,
-						Flow: flow, Framing: cam,
+						Flow: flow,
 					})
 				})
 			}, w, h).Image()
@@ -77,7 +76,7 @@ func TestWriteShots(t *testing.T) {
 			// 带压暗层与粒子的完整壁纸（等于主界面上看到的那一层，但没有 UI）。
 			full := ui.NewTester(func(c *ui.Context) {
 				ui.Column(c).Fill().Draw(func(p *ui.Painter, r ui.Rect) {
-					a.drawWallpaperAt(p, r, ch, bg, flow, ch.Tok, fx, cam)
+					a.drawWallpaperAt(p, r, ch, bg, flow, ch.Tok, fx)
 				})
 			}, w, h).Image()
 			savePNG(t, filepath.Join(dir, fmt.Sprintf("wallpaperfull-%s-t%.2f.png", ch.ID, tm)), full)

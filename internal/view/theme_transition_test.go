@@ -1,10 +1,6 @@
-package view
+﻿package view
 
-import (
-	"testing"
-
-	"bestuav-hanabi/internal/wallpaper"
-)
+import "testing"
 
 // TestSpringProgress 钉住主题切换的弹簧曲线：
 // 起点 0、单调、比匀速更早到达（0.1s 已经过半），到 0.42s 基本到 1。
@@ -26,30 +22,5 @@ func TestSpringProgress(t *testing.T) {
 	// 弹簧起步比 slowerstep 快：0.1s 时已经过半（匀速是 0.24）。
 	if v := springProgress(0.1); v < 0.6 {
 		t.Errorf("0.1s 应已过半（弹簧起步快），实际 %v", v)
-	}
-}
-
-// TestFramingMix 钉住取景插值：端点原样，中点居中。
-func TestFramingMix(t *testing.T) {
-	from := wallpaper.Framing{Zoom: 1.22, FocusX: 0.395, FocusY: 0.485}
-	to := wallpaper.Framing{Zoom: 1.02, FocusX: 0.605, FocusY: 0.485}
-
-	if got := from.Mix(to, 0); got != from {
-		t.Errorf("k=0 应等于起点，实际 %+v", got)
-	}
-	if got := from.Mix(to, 1); got != to {
-		t.Errorf("k=1 应等于终点，实际 %+v", got)
-	}
-	mid := from.Mix(to, 0.5)
-	if d := mid.Zoom - 1.12; d > 1e-5 || d < -1e-5 {
-		t.Errorf("中点 zoom 应为 1.12，实际 %v", mid.Zoom)
-	}
-	if d := mid.FocusX - 0.5; d > 1e-5 || d < -1e-5 {
-		t.Errorf("中点 focusX 应为 0.5，实际 %v", mid.FocusX)
-	}
-	// 零值要补成默认取景（zoom 1、居中），否则着色器会拿到 0 缩放。
-	def := wallpaper.Framing{}.Norm()
-	if def.Zoom != 1 || def.FocusX != 0.5 || def.FocusY != 0.5 {
-		t.Errorf("零值应归一成 zoom=1/居中，实际 %+v", def)
 	}
 }

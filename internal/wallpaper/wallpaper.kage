@@ -50,12 +50,6 @@ var DriftDir vec2
 // DriftSpeed 是环境漂移的相位速度倍率（水慢、风快）。
 var DriftSpeed float
 
-// Zoom 是取景缩放（1 = 刚好铺满）。参考项目每个角色 1.02~1.22。
-var Zoom float
-
-// Focus 是落在窗口中心的图片坐标（0.5,0.5 = 居中）。参考项目按角色左右偏。
-var Focus vec2
-
 // wave 是三阶正弦的谐波求和。
 //
 // 纯正弦走起来像机械抖动；叠上高次谐波才有"快慢不一"的自然感。
@@ -68,12 +62,10 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	size := rectSize()
 	img := image0Size()
 
-	// 取景：cover 之后再乘 Zoom（>1 裁得更紧），并把 Focus 平移到窗口中心——
-	// 与参考项目 background.cpp 的 `p = (uv-.5)*cover/view.y + view.zw` 同式。
-	zoom := max(Zoom, 1.0)
-	s := max(size.x/img.x, size.y/img.y) * zoom
+	// Cover：按较大的那个比例缩放后居中裁切，与 Go 侧 p.Image(bg, r, ui.Cover) 一致。
+	s := max(size.x/img.x, size.y/img.y)
 	off := (size - img*s) * 0.5
-	uv := (pos-off)/s/img + (Focus - vec2(0.5)) // 图片空间的 0..1 坐标
+	uv := (pos - off) / s / img // 图片空间的 0..1 坐标
 
 	// 位移只在遮罩内产生；Play=0 时 delta 恒为零，等价于直接按 uv 采样。
 	delta := vec2(0.0, 0.0)

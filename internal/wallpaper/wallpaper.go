@@ -53,41 +53,6 @@ type Flow struct {
 	DriftSpeed float32
 }
 
-// Framing 是取景：Zoom 越大裁得越紧，Focus 是落在窗口中心的图片坐标（0..1）。
-//
-// 参考项目给每个角色配了不同的取景（zoom 1.02~1.22、focusX 0.40~0.62），
-// 切换主题时镜头会从旧取景推拉到新取景——这就是"从后到前 / 从前到后"的来源。
-// 零值表示不缩放、居中。
-type Framing struct {
-	Zoom   float32
-	FocusX float32
-	FocusY float32
-}
-
-// Norm 把零值补成默认取景（zoom 1、居中），避免调用方到处判零。
-func (f Framing) Norm() Framing {
-	if f.Zoom <= 0 {
-		f.Zoom = 1
-	}
-	if f.FocusX <= 0 {
-		f.FocusX = 0.5
-	}
-	if f.FocusY <= 0 {
-		f.FocusY = 0.5
-	}
-	return f
-}
-
-// Mix 在两个取景之间插值（k=0 取 a，k=1 取 b）。
-func (f Framing) Mix(to Framing, k float32) Framing {
-	a, b := f.Norm(), to.Norm()
-	return Framing{
-		Zoom:   a.Zoom + (b.Zoom-a.Zoom)*k,
-		FocusX: a.FocusX + (b.FocusX-a.FocusX)*k,
-		FocusY: a.FocusY + (b.FocusY-a.FocusY)*k,
-	}
-}
-
 // Options 是一次壁纸绘制的全部参数。
 type Options struct {
 	// Time 是动效秒数，Play 是动效强度 0..1（0 = 静止）。
@@ -98,8 +63,6 @@ type Options struct {
 	TintAmount float32
 	// Flow 是可选的动态素材，nil 表示该主题完全静态。
 	Flow *Flow
-	// Framing 是取景（缩放与焦点）。
-	Framing Framing
 }
 
 // Draw 在 r 处按 o 绘制壁纸。
@@ -120,7 +83,6 @@ func Draw(p *ui.Painter, bg *ui.Bitmap, r ui.Rect, o Options) {
 			dir = o.Flow.DriftDir
 		}
 	}
-	f := o.Framing.Norm()
 	// image0=背景，image1=人物闸门，image2=发丝（R/G 两层），image3=环境。
 	// 空缺槽位读透明（权重 0），对应层自动不参与。
 	fx.Draw(p, r, shader.Options{
@@ -134,8 +96,6 @@ func Draw(p *ui.Painter, bg *ui.Bitmap, r ui.Rect, o Options) {
 			"DriftStrength":  drift,
 			"DriftDir":       dir[:],
 			"DriftSpeed":     speed,
-			"Zoom":           f.Zoom,
-			"Focus":          []float32{f.FocusX, f.FocusY},
 		},
 		Images: [4]*ui.Bitmap{bg, person, hair, ambient},
 	})
