@@ -81,6 +81,9 @@ type App struct {
 // animFPS 是壁纸动效的重绘频率：这类缓慢漂移在这个帧率下已经连续。
 const animFPS = 12
 
+// blinkFPS 是眨眼期间的重绘频率：眨眼只有 0.2 秒，12fps 下只够两帧，会变成"闪一下"。
+const blinkFPS = 30
+
 // 界面动效时长。
 const (
 	themeFade = 420 * time.Millisecond // 参考 Shell::SetTheme 的 0.42s
@@ -215,10 +218,10 @@ func (a *App) wallpaperFlowFor(c theme.Character) *wallpaper.Flow {
 // wallpaperFlow 是当前主题的动态素材（开场/正常绘制用）。
 func (a *App) wallpaperFlow() *wallpaper.Flow { return a.wallpaperFlowFor(a.char) }
 
-// wallpaperKeys 是 Keep 要保留的资源：当前壁纸、头像与三层动态遮罩。
+// wallpaperKeys 是 Keep 要保留的资源：当前壁纸、头像、三层动态遮罩与眨眼补丁。
 func wallpaperKeys(c theme.Character) []string {
 	keep := []string{c.Bg, c.Icon}
-	for _, p := range []string{c.Motion.Person, c.Motion.Hair, c.Motion.Ambient} {
+	for _, p := range []string{c.Motion.Person, c.Motion.Hair, c.Motion.Ambient, c.Motion.Blink} {
 		if p != "" {
 			keep = append(keep, p)
 		}
@@ -488,6 +491,15 @@ func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch theme.Character,
 	// 着色器驱动：Cover 铺满 + 按角色元素色保亮度染色；
 	// 人物、发丝、环境三层遮罩决定"谁能动"。
 	wallpaper.Draw(p, bg, r, elapsed, a.animPlay, tok.Accent, ch.WallTint, flow)
+
+	// 眨眼：叠一张闭眼补丁（只有带 .hbc 逐帧动画的主题有）。
+	// 必须画在压暗层**之前**——它属于壁纸本身；画在压暗层之上会亮出一块补丁印。
+	blink := float32(0)
+	if a.animPlay > 0 && ch.Motion.Blink != "" {
+		blink = blinkAmount(elapsed)
+		a.drawBlink(p, r, bg, ch, elapsed, blink)
+	}
+
 	scrim := a.settings.EffectiveScrim(ch.Scrim)
 	p.Fill(r, ui.RGBA(6, 12, 22, scrim), 0) // 按壁纸亮度压暗（见 Character.Scrim）
 
@@ -499,8 +511,13 @@ func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch theme.Character,
 	a.drawWallpaperParticles(p, r, ch, elapsed, a.animPlay)
 
 	// 下一帧：只重绘这块，不重建元素树。动效关掉时不必再请求重绘。
+	// 眨眼只有两三帧，12fps 下会闪一下；闭眼期间临时提到 30fps，之后落回 12fps。
 	if a.animPlay > 0 {
-		p.AnimationFrameRate(animFPS)
+		if blink > 0 {
+			p.AnimationFrameRate(blinkFPS)
+		} else {
+			p.AnimationFrameRate(animFPS)
+		}
 	}
 }
 
