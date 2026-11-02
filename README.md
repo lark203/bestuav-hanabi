@@ -42,12 +42,19 @@
   - **主题卡片**：每个角色一套纹样组合（金鱼+烟花、樱花+御守、叶枝、礼帽+水波、
     棱晶+古书、岩印+回纹），元素徽记统一放大到 (36,31)
   - **内容区右下角**：对应的大幅淡纹
-  - 开场已有各自标识；纳西妲的殿堂、芙宁娜的舞台、珐露珊的机关仍是共享时间轴上的标识演出，
-    不是参考项目的完整分镜（作为后续可选）
-- **开场动画（6.20 秒）**：时间轴与粒子参数**照搬原项目**（同一套 LCG 随机数种子，粒子分布逐帧对应）；
+- **开场分镜**（按 `Opening` 分发，时间轴仍是 6.2 秒）：
+  - 甘雨：霜莲珠升起 + 三条冰绸 + 70 粒冰星迸发 + 2.42s 闪光
+  - 宵宫：升空拖尾 + 主/副烟花 + 两只金鱼环绕 + 火舌标识
+  - 八重神子：三座神樱 + 雷弧连到中心 + 落樱 + 雷光标识
+  - 纳西妲：莲台绽放 + 梦境拱殿 + 叶环与光尘 + 草叶标识
+  - 芙宁娜：两侧幕布拉开 + 三层水上舞台 + 落珠/水花 + 水滴标识
+  - 珐露珊：六叶机关旋转展开 + 三道风带 + 光尘 + 风纹标识
+  - 钟离：八枚岩方块下坠散开 + 石柱厅 + 金菱粒子 + 岩印标识
+  - 这是纯 2D 分镜；原版的开场标识是几千个三角形的 3D 材质网格，这里不逐顶点复刻
+- **开场动画（6.20 秒）**：时间轴与粒子参数**照搬原项目**；
   **动画期间品牌位留空**，标识飞抵品牌图标位置后由静态标识接手（交接契约有像素级回归测试 `TestBrandHandoff`）
   - 时间轴：0.20s 上升 → 1.45s 转向 → 3.65s 成形 → 4.65s 停靠 → 6.20s 结束
-  - 32 片雪（斜向短划）+ 20 盏孔明灯（暖光晕、边缘淡入淡出），随 6.2 秒向上飘
+  - 甘雨保留 32 片雪 + 20 盏孔明灯；其余角色用各自的背景建筑/光景与元素氛围粒子
   - 标识按当前角色的 Motif 画：冰晶 / 焰火 / 雷光 / 岩印 / 草叶（三片叶子 + 芽心）/
     水滴（水纹扩散）/ 风纹（回旋气流），不再把草、水、风回落到冰晶
   - 结束时标识收缩并停靠到侧栏头像位置，开场层淡出、主界面「透出来」（不切视图）
@@ -86,11 +93,11 @@
 
 未完成（见路线图）：
 
-- 标识的 3D 质感（原版是 5122 三角形 + 自定义顶点着色，这里是矢量近似）
-- 纳西妲 / 芙宁娜 / 珐露珊的**完整开场分镜**（殿堂、水上舞台、机关聚合）；目前是共享
-  6.2 秒时间轴上的专属标识与粒子，不是参考项目的整段演出
-- 发布：把 `build/windows-amd64/` 里的压缩包与 `update-windows-amd64.json` 上传到
-  `updates.url`（当前是 AtomGit latest 目录），自动更新才能端到端生效
+- 开场与标识都是**2D 矢量近似**：原版的 3D 材质网格、逐顶点着色和体积粒子没有 1:1 复刻，
+  分镜的构图/节奏/元素已经按 `characters/*/*_intro.cpp` 对齐
+- 发布：在 GitHub 创建 `bestuav/bestuav-hanabi` 后，用 `mygo build -upload` 把
+  安装包、更新压缩包与 `update-windows-amd64.json` 上传为 draft release；发布后
+  自动更新才能端到端生效
 - 壁纸页按需求保持现状（占位）；黑白基础主题暂不做；最小化退场动画待定
 
 ## 预览
@@ -110,6 +117,14 @@
 | 主题页 · 外观与启动 | 设置 · 通用 |
 |---|---|
 | ![外观与启动](docs/screenshots/appearance.png) | ![设置](docs/screenshots/settings.png) |
+
+| 开场 · 宵宫（烟花金鱼） | 开场 · 纳西妲（梦境莲台） | 开场 · 钟离（岩柱流星） |
+|---|---|---|
+| ![宵宫开场](docs/screenshots/opening-yoimiya.png) | ![纳西妲开场](docs/screenshots/opening-nahida.png) | ![钟离开场](docs/screenshots/opening-zhongli.png) |
+
+| 开场 · 八重神子（神樱雷） | 开场 · 芙宁娜（水上舞台） | 开场 · 珐露珊（机关风带） |
+|---|---|---|
+| ![八重开场](docs/screenshots/opening-yae.png) | ![芙宁娜开场](docs/screenshots/opening-furina.png) | ![珐露珊开场](docs/screenshots/opening-faruzan.png) |
 
 | 开场 · 抽枝生长（0.9s） | 开场 · 转向成形（2.5s） | 开场 · 完全成形（3.75s） |
 |---|---|---|
@@ -158,29 +173,32 @@ go build ./...
 
 ## 打包与自动更新
 
-`mygo.json` 的 `updates.publicKey` 是更新签名公钥，`updates.url` 是发布目录
-（当前指向 AtomGit 的 latest 下载目录）。私钥**不进仓库**，放在仓库外的
+`mygo.json` 的 `updates.publicKey` 是更新签名公钥，`updates.github` 指向
+`bestuav/bestuav-hanabi`：`mygo build -upload` 会把安装包、更新压缩包与
+`update-windows-amd64.json` 作为 GitHub draft release 上传，发布后应用从
+GitHub 的 latest release 读取 manifest。私钥**不进仓库**，放在仓库外的
 `D:\workbuddy\bestuav-hanabi-update-keys\mygo-update.key`（或 CI secret），
-构建时通过 `MYGO_UPDATER_PRIVATE_KEY` 传入：
+构建/上传时通过 `MYGO_UPDATER_PRIVATE_KEY` 和 `GH_TOKEN` 传入：
 
 ```powershell
 $env:MYGO_UPDATER_PRIVATE_KEY = (Get-Content -Raw D:\workbuddy\bestuav-hanabi-update-keys\mygo-update.key).Trim()
-go tool mygo build
+$env:GH_TOKEN = "ghp_..."           # 上传时需要
+go tool mygo build -upload
 # 或者
-.\scripts\build-release.ps1
+.\scripts\build-release.ps1 -Upload
 ```
 
 产物在 `build/windows-amd64/`：`花火.exe`、`hanabi-<version>-windows-amd64.tar.gz`、
 `hanabi-setup-<version>-windows-amd64.exe`，以及 `update-windows-amd64.json`。
-把压缩包与 manifest 上传到 `updates.url` 指向的 release（文件名保持不变），
-已安装的旧版本就能在「设置 → 版本与更新」里检查、下载、安装并重启。
+把压缩包与 manifest 上传到 GitHub draft release（`-upload` 会自动做，文件名保持不变），
+发布 release 后，已安装的旧版本就能在「设置 → 版本与更新」里检查、下载、安装并重启。
 
 - 自动更新的检查和安装都在 goroutine 里，UI 只读原子进度；开发/测试构建
   `Updater.Enabled()=false`，不会联网。
 - `go tool mygo build` 在没有私钥时会跳过更新文件；发布版必须带私钥构建。
-- 当前 AtomGit 还没有 `v0.1.0` release，`mygo build` 计算 delta 时会读到网页而
-  给出 warning；发布 release 后该地址返回 manifest，warning 消失。首次发布可
-  先手动上传，或按 mygo 文档接 GitHub/S3。
+- 当前 GitHub 仓库还没创建；未创建时 `mygo build` 计算 delta 会因读不到 release
+  给出 warning，创建仓库并发布首个 release 后消失。首次发布需要 `GH_TOKEN`，
+  并用 `mygo build -upload` 生成 draft，再在 GitHub 上发布。
 
 ## 目录
 
@@ -201,6 +219,7 @@ internal/view/          界面根：App 状态、开场渲染、侧栏、标题�
                         ornament_primitives.go：金鱼/樱花/叶枝/礼帽/棱晶/古书/岩印
                         ornaments_ui.go：纹样在内容区/侧栏/导航/卡片上的排布
                         chrome.go：七个角色的窗口按钮造型
+                        opening.go：七个角色的开场分镜与背景
                         appearance.go：主题页的外观与启动视图
                         settings_page.go：通用设置（版本/更新、数据、关于）
                         update.go：自动更新的检查/下载/安装状态机
@@ -223,9 +242,9 @@ go test ./...          # 时间轴/粒子/姿态 + 开场渲染冒烟
 
 ## 路线图
 
-1. **发布第一个 release**：把签名产物与 manifest 传到 AtomGit latest 目录，验证
-   「检查 → 下载 → 安装 → 重启」整条链路
-2. **可选**：纳西妲 / 芙宁娜 / 珐露珊的完整开场分镜、最小化退场动画、标识的 3D 质感
+1. **发布第一个 GitHub release**：在 `bestuav/bestuav-hanabi` 用 `mygo build -upload`
+   生成 draft release，验证「检查 → 下载 → 安装 → 重启」整条链路
+2. **可选**：标识/开场的 3D 材质网格、最小化退场动画、更多分镜细节
 3. 壁纸页保持现状；黑白基础主题不做
 
 ## 说明

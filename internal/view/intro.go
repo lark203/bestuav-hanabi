@@ -71,56 +71,18 @@ func (a *App) drawIntro(p *ui.Painter, r ui.Rect) {
 
 	// 图层部分（底色/粒子/品牌字）随 fade 淡出；fade 归零后只剩标识。
 	if fade > 0.002 {
-		drawIntroLayer(p, r, in, fade, short)
+		a.drawIntroLayer(p, r, in, fade, short)
 	}
 
 	pose := in.Pose(introDockX, introDockY)
+	// 专属场景在标识之前、4.10s 后先退场；标识继续飞向品牌位。
+	if sceneA := 1 - intro.Smooth(in.T, 4.10, 4.65); sceneA > 0.002 {
+		a.drawOpeningScene(p, r, pose, sceneA)
+	}
 	a.drawMark(p, pose, markFade)
-}
-
-// drawIntroLayer 开场的背景、粒子与右下角品牌字（不含标识）。
-func drawIntroLayer(p *ui.Painter, r ui.Rect, in *intro.Intro, fade, short float32) {
-
-	// 1) 底色：上深下略浅，给画面一点空气透视（原项目四角不同色的近似）。
-	// 开场期必须几乎不透明：下面压着的是真实界面（浅色玻璃卡片很抢眼），
-	// 原项目 0.93 的底色在自己的窗口里够用，在这里会让 UI 明显透出来。
-	p.FillGradient(r, ui.LinearGradient{
-		From:  ui.RGBA(8, 20, 30, 0.995*fade),
-		To:    ui.RGBA(19, 35, 40, 0.985*fade),
-		Angle: 180,
-	}, 0)
-
-	// 2) 左右两侧的暗边：把视线收到中间（各占 22% 宽，向内渐隐）。
-	sideW := r.W * 0.22
-	p.FillGradient(ui.Rect{X: r.X, Y: r.Y, W: sideW, H: r.H}, ui.LinearGradient{
-		From: ui.RGBA(4, 11, 18, 0.28*fade), To: ui.Transparent, Angle: 90,
-	}, 0)
-	p.FillGradient(ui.Rect{X: r.X + r.W - sideW, Y: r.Y, W: sideW, H: r.H}, ui.LinearGradient{
-		From: ui.Transparent, To: ui.RGBA(4, 11, 18, 0.28*fade), Angle: 90,
-	}, 0)
-
-	// 3) 孔明灯：从下往上升。
-	for i := 0; i < intro.LantCount; i++ {
-		x, y, al, size := in.LanternAt(i, short)
-		if al <= 0.004 || size <= 0.3 {
-			continue
-		}
-		drawLantern(p, r.X+r.W*x, r.Y+r.H*y, size, al*fade)
+	if fade > 0.002 {
+		drawIntroBrand(p, r, in, fade)
 	}
-
-	// 4) 雪：斜向短划，越近越长越亮。
-	for i := 0; i < intro.SnowCount; i++ {
-		x, y, al, ln := in.SnowAt(i, short)
-		if al <= 0.01 || ln <= 0 {
-			continue
-		}
-		cx, cy := r.X+r.W*x, r.Y+r.H*y
-		w := max32(0.65, ln*0.45)
-		seg(p, cx, cy, cx+ln*0.45, cy-ln*1.8, w, ui.RGBA(208, 235, 243, al*fade))
-	}
-
-	// 6) 品牌字。
-	drawIntroBrand(p, r, in, fade)
 }
 
 // drawLantern 画一盏孔明灯：柔光晕 → 灯身 → 顶口 → 灯芯。

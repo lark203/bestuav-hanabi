@@ -1,11 +1,13 @@
 # Builds signed Windows installers and the update manifest.
+# With -Upload, uploads them to the GitHub draft release of this version.
 #
 # The update private key never enters the repository. Pass it in
 # MYGO_UPDATER_PRIVATE_KEY, or let the script read the key that
 # `go tool mygo keygen` wrote outside the checkout.
 param(
     [string]$KeyPath = "",
-    [switch]$SkipInstaller
+    [switch]$SkipInstaller,
+    [switch]$Upload
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +24,12 @@ if (-not $env:MYGO_UPDATER_PRIVATE_KEY) {
 
 $buildArgs = @("build")
 if ($SkipInstaller) { $buildArgs += "-skip-installer" }
+if ($Upload) {
+    if (-not $env:GH_TOKEN) {
+        throw "GH_TOKEN is required for -Upload (GitHub token with repo release permission)."
+    }
+    $buildArgs += "-upload"
+}
 & go tool mygo @buildArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
