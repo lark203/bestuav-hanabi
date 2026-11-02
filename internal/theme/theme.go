@@ -150,14 +150,21 @@ type Character struct {
 	// Icon 是头像的相对路径；空表示没有头像素材，界面用元素色圆点占位。
 	Icon string
 
-	// Overlay 是叠在壁纸之上的装饰层路径（如甘雨的孔明灯 / 清心花纹），
-	// 空表示无叠层——着色器按 OverlayStrength=0 跳过，其余主题完全不受影响。
-	// 仅甘雨等带预处理图层的角色有；素材来自原项目 assets/tex 的同名文件。
-	Overlay string
-	// OverlayMask 是装饰层的透明度遮罩路径（与 Overlay 配套；空表示该层不带遮罩）。
-	OverlayMask string
-	// OverlayStrength 是叠层的合成强度 0..1（仅 Overlay 非空时生效）。
-	OverlayStrength float32
+	// FlowMask 是壁纸局部流动的区域权重遮罩路径（灰度，非零处才形变）。
+	//
+	// 必须与 Bg 同源、构图对齐——遮罩决定"哪里动"。甘雨的 flow-mask 只覆盖
+	// 头部发区（实测非零 9.5%，bbox x 31%~82% / y 0%~42%，下半张全 0），
+	// 所以看起来只有发型在飘，人物主体不动。
+	//
+	// 空表示该角色没有流动素材：着色器按 FlowStrength=0 跳过，其余主题不受影响。
+	FlowMask string
+	// FlowStrength 是形变的最大位移，单位是图片 UV（0.01 = 图宽的 1%）。
+	FlowStrength float32
+	// FlowDir 是形变主方向（单位向量，y 向下）；零值按水平向右处理。
+	//
+	// 方向不做成逐像素：原项目 flow-rg 实测 95% 像素是中性色、仅约 5% 有方向，
+	// 当方向场用只会零星抖动；参考项目同样把方向放在每层配置里。
+	FlowDir ui.Point
 
 	// WallTint 是壁纸染色的强度 0..1：0 = 保持原图颜色。
 	// 各自的壁纸色调已经贴合角色，这里只做轻微统一，通常 0.1~0.2。
@@ -206,10 +213,11 @@ var all = []Character{
 		Element: Cryo, Motif: MotifCrystal, WallTint: 0.15, Scrim: 0.32,
 		CardBg: ui.Hex("#14314A"), Art: ArtBlossom,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
-		// 甘雨专属装饰叠层：孔明灯 / 清心花纹。颜色层 + 透明度遮罩来自原项目，
-		// 相对背景做更轻的反向漂动（见 wallpaper.kage 的 OverlayStrength 分支）。
-		Overlay: "ganyu/ganyu-overlay.jpg", OverlayMask: "ganyu/ganyu-overlay-alpha.png",
-		OverlayStrength: 0.9,
+		// 甘雨专属局部流动：发区遮罩（原项目预烘焙图层）。遮罩只覆盖头部发区，
+		// 形变后仍采样同一张背景，所以是"只有发型在飘"，不是整幅平移。
+		// 方向取右上（发丝自然的飘向），幅度 1.2% 图宽。
+		FlowMask: "ganyu/ganyu-flow-mask.png", FlowStrength: 0.012,
+		FlowDir: ui.Point{X: 0.94, Y: -0.34},
 	},
 	{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",

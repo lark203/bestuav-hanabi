@@ -1,19 +1,28 @@
 package main
 
-// 壁纸：一张静态插画，靠随时间缓慢漂移的 UV 把它"吹活"，并按主题染色。
+// 壁纸：一张静态插画，只有遮罩圈定的局部（甘雨是头部发丝）随时间摆动。
 //
-// 原项目用 flow-rg 方向场 + wave/phase 三张图驱动，这里先用两层不同频率、
-// 不同相位的正弦叠加——视觉上同样是"低频、连续、无重复感"的流动，
-// 但省掉三张 1920×1080 的采样，CPU 渲染器也能实时跑。
+// 模型照搬参考项目（HanaBi-ui-Genshin 的 LayeredWallpaper）：
 //
-// 甘雨等带 Overlay 的主题会再叠一层装饰图（孔明灯 / 清心花纹）：该层相对背景
-// 做更轻、不同相位的反向漂动，像灯笼在夜色里摇曳——而不是和背景一起平移。
-// OverlayStrength = 0（或 image1 未绑定，mygo 读为透明）时整段不生效，
-// 其余主题（不传 overlay）完全不受影响。
+//	mask = masks.Sample(q)[j]
+//	phase = 噪声/坐标相位 + 时间，经多阶正弦求和
+//	q    += dir * 幅度 * phase * mask
+//	return image.Sample(clamp, q)
 //
-// 可见性：之前漂移幅度只有 UV 的 0.2%~0.5%、周期约 39 秒，肉眼几乎无感。
-// 现在放大到约 0.8%~2.2%、周期约 20~26 秒；为避免 Cover 同比例时位移露黑边，
-// 采样先做 8% 的 overscan（内缩四周各留余量）。
+// 三个要点，都是实测后定的：
+//  1. **始终采样同一张图**（image0）。曾叠第二张人物图相对漂移，等于把另一张画
+//     平移一段盖上去，相邻像素整体错位 → 观感是"两个人在相对移动"。已废弃。
+//  2. **方向是常量**，不是从图里读。原项目 flow-rg 实测 95% 像素是中性色
+//     (127,127)、只有约 5% 有方向，当逐像素方向场用只会零星几点在抖。
+//     参考项目同样用每层配置的常量方向（b.xy），这里照做。
+//  3. **遮罩要软化**。原项目 flow-mask 实测 p50=255，是硬二值边；直接位移会在
+//     遮罩边界撕出发丝断口，所以采样时做一次 5 点平均。
+//
+// 素材语义（按像素实测）：
+//   - flow-mask   960×540 灰度：形变区域，只覆盖头部发区（非零 9.5%，
+//     bbox x 31%~82% / y 0%~42%，下半张全 0）——"只有发型在动"的依据
+//   - flow-phase 1920×1080 灰度：实测全 255，无信息量，不使用
+//   - flow-rg    1920×1080 RGB：见上面第 2 点，不使用
 
 var Time float // 秒，动效时钟
 var Play float // 0..1，动效强度；0 = 完全静止（截图对比与低功耗场景用）
@@ -21,7 +30,26 @@ var Play float // 0..1，动效强度；0 = 完全静止（截图对比与低功
 var Tint vec3        // 目标色调（元素色，0..1）
 var TintAmount float // 0 = 原色，1 = 完全染色
 
-var OverlayStrength float // 0 = 不叠加装饰层；>0 时 image1（颜色）/image2（遮罩）参与合成
+// FlowStrength 是局部形变的最大位移，单位是图片 UV（0.01 = 图宽的 1%）。
+// 0 表示该主题没有流动素材，整段跳过——其余主题完全不受影响。
+var FlowStrength float
+
+// FlowDir 是形变主方向（单位向量，y 向下）。零向量按 (1, 0) 处理。
+var FlowDir vec2
+
+// maskAt 采样区域权重，并在遮罩自身的像素格上做 5 点平均。
+//
+// 原图是硬边遮罩（非零处几乎都是 255），不平滑的话位移会在边界处
+// 把发丝切断成台阶。这里按遮罩的 texel 尺寸取十字邻域，代价是 5 次采样。
+func maskAt(uv vec2, mimg vec2) float {
+	t := 2.0 / mimg
+	s := image1Sample(uv*mimg).r
+	s = s + image1Sample((uv+vec2(t.x, 0.0))*mimg).r
+	s = s + image1Sample((uv-vec2(t.x, 0.0))*mimg).r
+	s = s + image1Sample((uv+vec2(0.0, t.y))*mimg).r
+	s = s + image1Sample((uv-vec2(0.0, t.y))*mimg).r
+	return s / 5.0
+}
 
 func Fragment(dst vec4, pos vec2) vec4 {
 	size := rectSize()
@@ -32,20 +60,25 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	off := (size - img*s) * 0.5
 	uv := (pos - off) / s / img // 图片空间的 0..1 坐标
 
-	// 采样内缩（zoom<1）给漂移留边缘余量：把 [0,1] 映射到 [0.04,0.96]，
-	// 四周各留 ~4% 余量，漂移幅度不超过余量就不会顶到图像边缘
-	//（Cover 在壁纸与窗口等比例时本无余量，直接位移会露采样黑边）。
-	zoom := 0.92
-	uv = (uv-0.5)*zoom + 0.5
+	if FlowStrength > 0.001 {
+		mimg := image1Size()
+		mask := maskAt(uv, mimg)
 
-	// 两条低频波：一条横着走、一条斜着走，周期与相位都不同，叠加后不成规律。
-	w1 := sin(uv.x*4.0 + uv.y*1.5 + Time*0.32)
-	w2 := sin(uv.y*6.0 - uv.x*2.0 - Time*0.24)
+		// 相位用两组不同的空间频率与速度，各经三阶正弦求和——纯正弦会像机械抖动，
+		// 谐波叠加才是"一缕一缕、快慢不一"的飘动（系数取自参考项目的傅里叶级数）。
+		ph1 := dot(uv, vec2(7.0, 11.0)) + Time*1.10
+		ph2 := dot(uv, vec2(-5.0, 9.0)) - Time*0.77
+		s1 := sin(ph1) - 0.1616*sin(2.0*ph1) + 0.0083*sin(3.0*ph1)
+		s2 := sin(ph2+0.4) - 0.1616*sin(2.0*ph2+0.8) + 0.0083*sin(3.0*ph2+1.2)
 
-	// 近景（uv.y 大）漂得多，远景几乎不动。幅度显著放大到约 0.8%~2.2%，
-	// 周期约 20~26 秒——缓慢但肉眼可辨的流动。
-	amp := (0.008 + 0.014*uv.y) * Play
-	uv = uv + vec2(w1, w2)*amp
+		dir := FlowDir
+		if dot(dir, dir) < 0.001 {
+			dir = vec2(1.0, 0.0)
+		}
+		// 主方向走 s1，垂直方向带 0.3 的 s2：发丝主要顺向飘，同时有轻微侧摆。
+		perp := vec2(-dir.y, dir.x)
+		uv = uv + (dir*s1 + perp*0.3*s2)*(FlowStrength*mask*Play)
+	}
 
 	c := image0Sample(uv * img)
 
@@ -54,27 +87,6 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	tintLuma := max(dot(Tint, vec3(0.299, 0.587, 0.114)), 0.06)
 	tinted := Tint * (luma / tintLuma)
 	c = vec4(mix(c.rgb, tinted, TintAmount), c.a)
-
-	// 甘雨等主题的装饰叠层：孔明灯 / 清心花纹。相对背景做更轻、不同相位的反向漂动，
-	// 制造层间错位的呼吸感；遮罩（image2）决定哪里透出、哪里不显。
-	if OverlayStrength > 0.001 {
-		oimg := image1Size()
-		os := max(size.x/oimg.x, size.y/oimg.y)
-		ooff := (size - oimg*os) * 0.5
-		ouv := (pos - ooff) / os / oimg
-		ouv = (ouv-0.5)*zoom + 0.5
-
-		// 与背景不同的频率与相位、幅度更小且速度更慢——层与层错位摇曳而不是整体平移。
-		ow := sin(ouv.x*3.0 - ouv.y*2.0 + Time*0.20)
-		oamp := (0.006 + 0.010*ouv.y) * Play
-		ouv = ouv + vec2(ow, ow*0.6) * oamp
-
-		oc := image1Sample(ouv * oimg)
-		// image2 是透明度遮罩（红通道）：未绑定时 mygo 读为透明，ma = 0，叠层自动不显。
-		ma := image2Sample(ouv * oimg).r
-		a := ma * OverlayStrength
-		c = vec4(mix(c.rgb, oc.rgb, a), c.a)
-	}
 
 	return c
 }

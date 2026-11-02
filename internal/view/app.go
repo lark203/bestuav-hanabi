@@ -56,22 +56,18 @@ func NewApp() *App {
 	return &App{char: c, tok: c.Tok, page: "library", t0: time.Now(), animPlay: 1, filter: -1}
 }
 
-// wallpaperOverlay 构造当前主题的装饰叠层；仅甘雨等带 Overlay 的角色返回非空。
+// wallpaperFlow 构造当前主题的局部流动素材；仅带流动图层的角色（甘雨）返回非空。
 //
-// 叠层的颜色图与遮罩图同样走 assets 缓存（缺图返回 nil，壁纸退化为无叠层）。
-func (a *App) wallpaperOverlay() *wallpaper.Overlay {
-	if a.char.Overlay == "" {
+// 遮罩走 assets 缓存（缺图返回 nil，壁纸退化为静态，不会报错）。
+func (a *App) wallpaperFlow() *wallpaper.Flow {
+	if a.char.FlowMask == "" {
 		return nil
 	}
-	img := assets.Bitmap(a.char.Overlay)
-	if img == nil {
+	mask := assets.Bitmap(a.char.FlowMask)
+	if mask == nil {
 		return nil
 	}
-	o := &wallpaper.Overlay{Image: img, Strength: a.char.OverlayStrength}
-	if a.char.OverlayMask != "" {
-		o.Mask = assets.Bitmap(a.char.OverlayMask)
-	}
-	return o
+	return &wallpaper.Flow{Mask: mask, Dir: a.char.FlowDir, Strength: a.char.FlowStrength}
 }
 
 // setCharacter 切换角色主题：令牌与标识画法一起换，界面下一帧即生效。
@@ -82,13 +78,10 @@ func (a *App) setCharacter(id string) {
 	}
 	a.char = c
 	a.tok = c.Tok
-	// 释放上一套的壁纸/头像/叠层像素：每张 4K 约 33MB，六套全留着会到 200MB。
+	// 释放上一套的壁纸/头像/流动遮罩像素：每张 4K 约 33MB，六套全留着会到 200MB。
 	keep := []string{c.Bg, c.Icon}
-	if c.Overlay != "" {
-		keep = append(keep, c.Overlay)
-		if c.OverlayMask != "" {
-			keep = append(keep, c.OverlayMask)
-		}
+	if c.FlowMask != "" {
+		keep = append(keep, c.FlowMask)
 	}
 	assets.Keep(keep...)
 }
@@ -118,13 +111,13 @@ func (a *App) View(c *ui.Context) {
 	// 所以 UI 天然压在壁纸上，不需要额外的层叠容器。
 	root := ui.Column(c).Fill().Background(a.tok.WinFill)
 	if bg := assets.Bitmap(a.char.Bg); bg != nil {
-		ov := a.wallpaperOverlay()
+		flow := a.wallpaperFlow()
 		root = root.Draw(func(p *ui.Painter, r ui.Rect) {
 			// 用帧时间而不是 time.Now()：重绘帧不重建 view，时间也来自同一个时钟。
 			elapsed := p.Now().Sub(a.t0).Seconds()
-			// 着色器驱动：Cover 铺满 + 缓慢流动 + 按角色元素色保亮度染色；
-			// 甘雨等带 Overlay 的主题会再叠一层孔明灯 / 清心花纹（相对背景轻漂）。
-			wallpaper.Draw(p, bg, r, elapsed, a.animPlay, a.tok.Accent, a.char.WallTint, ov)
+			// 着色器驱动：Cover 铺满 + 按角色元素色保亮度染色；
+			// 甘雨这类带流动图层的角色，只有遮罩内的细节（发丝）在摆，主体不动。
+			wallpaper.Draw(p, bg, r, elapsed, a.animPlay, a.tok.Accent, a.char.WallTint, flow)
 			p.Fill(r, ui.RGBA(6, 12, 22, a.char.Scrim), 0) // 按壁纸亮度压暗（见 Character.Scrim）
 
 			// 顶部再压一层渐变，托住标题区（在玻璃条之下，不影响玻璃本身的通透）。

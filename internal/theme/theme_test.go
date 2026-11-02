@@ -32,12 +32,16 @@ func TestCharacters(t *testing.T) {
 		if c.WallTint < 0 || c.WallTint > 1 {
 			t.Errorf("%s 的 WallTint 越界：%.2f", c.ID, c.WallTint)
 		}
-		if c.OverlayStrength < 0 || c.OverlayStrength > 1 {
-			t.Errorf("%s 的 OverlayStrength 越界：%.2f", c.ID, c.OverlayStrength)
+		if c.FlowStrength < 0 || c.FlowStrength > 0.2 {
+			t.Errorf("%s 的 FlowStrength 越界：%.3f（0.2 已远超可辨范围，疑为误填）", c.ID, c.FlowStrength)
 		}
-		// Overlay 与遮罩必须成对：有颜色层就该有遮罩，避免叠层静默不显。
-		if c.Overlay != "" && c.OverlayMask == "" {
-			t.Errorf("%s 有 Overlay 但缺 OverlayMask", c.ID)
+		// 没有遮罩却设了强度，等于配了套永远不会生效的参数——静默失效比报错更难查。
+		if c.FlowMask == "" && c.FlowStrength != 0 {
+			t.Errorf("%s 没有 FlowMask 却设了 FlowStrength=%.3f", c.ID, c.FlowStrength)
+		}
+		// 有遮罩就必须给方向（零向量会被着色器当 (1,0)，多半是漏填）。
+		if c.FlowMask != "" && c.FlowDir.X == 0 && c.FlowDir.Y == 0 {
+			t.Errorf("%s 有 FlowMask 但 FlowDir 为零向量", c.ID)
 		}
 		motifs[c.Motif] = true
 	}
