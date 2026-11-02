@@ -61,12 +61,7 @@ func TestWriteShots(t *testing.T) {
 			continue
 		}
 		flow := a.wallpaperFlowFor(ch)
-		times := []float64{0, 6}
-		if ch.Motion.Blink != "" {
-			// 闭眼最实的一刻（闭合段结束、保持段中间），用来检查眨眼补丁
-			times = append(times, blinkClose+blinkHold/2)
-		}
-		for _, tm := range times {
+		for _, tm := range []float64{0, 6} {
 			fx := tm
 			shot := ui.NewTester(func(c *ui.Context) {
 				ui.Column(c).Fill().Draw(func(p *ui.Painter, r ui.Rect) {
@@ -75,7 +70,7 @@ func TestWriteShots(t *testing.T) {
 			}, w, h).Image()
 			savePNG(t, filepath.Join(dir, fmt.Sprintf("wallpaper-%s-t%.2f.png", ch.ID, tm)), shot)
 
-			// 带压暗层、粒子与眨眼的完整壁纸（等于主界面上看到的那一层，但没有 UI）。
+			// 带压暗层与粒子的完整壁纸（等于主界面上看到的那一层，但没有 UI）。
 			full := ui.NewTester(func(c *ui.Context) {
 				ui.Column(c).Fill().Draw(func(p *ui.Painter, r ui.Rect) {
 					a.drawWallpaperAt(p, r, ch, bg, flow, ch.Tok, fx)
@@ -83,7 +78,7 @@ func TestWriteShots(t *testing.T) {
 			}, w, h).Image()
 			savePNG(t, filepath.Join(dir, fmt.Sprintf("wallpaperfull-%s-t%.2f.png", ch.ID, tm)), full)
 		}
-		t.Logf("%s 出图完成（flow=%v，blink=%q）", ch.ID, flow != nil, ch.Motion.Blink)
+		t.Logf("%s 出图完成（flow=%v）", ch.ID, flow != nil)
 	}
 }
 

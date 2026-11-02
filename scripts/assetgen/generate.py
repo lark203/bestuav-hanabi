@@ -323,28 +323,11 @@ def raster_layer(layer: dict, frames: int, frame: float, w: int, h: int,
     return rgba, alpha, maskr
 
 
-def _shift(a: np.ndarray, dx: int, dy: int) -> np.ndarray:
-    """把二维/三维数组平移 (dx, dy) 像素，空出来的地方填 0（不循环）。"""
-    out = np.zeros_like(a)
-    h, w = a.shape[:2]
-    xs0, xs1 = max(dx, 0), min(w + dx, w)
-    ys0, ys1 = max(dy, 0), min(h + dy, h)
-    xd0, xd1 = max(-dx, 0), min(w - dx, w)
-    yd0, yd1 = max(-dy, 0), min(h - dy, h)
-    if xs1 > xs0 and ys1 > ys0:
-        out[yd0:yd1, xd0:xd1] = a[ys0:ys1, xs0:xs1]
-    return out
-
-
-def bake_character(hbc: dict, frame_ratio: float, w: int, h: int, overrides: dict | None = None):
+def bake_character(hbc: dict, frame_ratio: float, w: int, h: int):
     """按图层顺序把人物合成成一张 RGBA，并返回人物 alpha / 发丝遮罩（1920×1080）。
 
     图层 kind：0 = 普通，1 = 眼睛（视线偏移），2 = 光晕，3 = 裁剪区域
     （后续图层被裁到这个多边形内，直到 id 等于 wave[0] 的图层）。
-
-    overrides 用来「换一张表情」：{图层下标: (帧比例, (dx, dy))}，把这一层单独按另一帧
-    光栅化再平移 (dx, dy) 像素。眨眼补丁就是这么来的——眼睛（kind==1）用闭眼帧，
-    其余图层保持在睁眼帧，避免整个人物跟着换姿势。
     """
     frames = hbc["frames"]
     frame = frame_ratio * (frames - 1)
@@ -358,15 +341,7 @@ def bake_character(hbc: dict, frame_ratio: float, w: int, h: int, overrides: dic
     clip_end = -1
 
     for i, layer in enumerate(hbc["layers"]):
-        lay_frame = frame
-        if overrides and i in overrides:
-            ratio, (dx, dy) = overrides[i]
-            lay_frame = ratio * (frames - 1)
-        rgba, alpha, maskr = raster_layer(layer, frames, lay_frame, w, h, with_mask=True)
-        if overrides and i in overrides:
-            _, (dx, dy) = overrides[i]
-            if dx or dy:
-                rgba, alpha, maskr = _shift(rgba, dx, dy), _shift(alpha, dx, dy), _shift(maskr, dx, dy)
+        rgba, alpha, maskr = raster_layer(layer, frames, frame, w, h, with_mask=True)
         if layer["kind"] == 3:
             clip = alpha > 0.5
             clip_end = int(layer["wave"][0])
@@ -420,99 +395,6 @@ def bake_character(hbc: dict, frame_ratio: float, w: int, h: int, overrides: dic
     rgb = np.where(a > 1e-6, canvas[..., :3] / np.maximum(a, 1e-6), 0.0)
     char = Image.fromarray((np.concatenate([rgb, a], axis=-1) * 255).round().astype(np.uint8), "RGBA")
     return char, person, veil, wave, best[1]
-
-
-# ---------------------------------------------------------------- 眨眼补丁
-
-
-def eye_layer_index(hbc: dict) -> int | None:
-    """眼睛图层的下标（kind==1）。没有就返回 None。"""
-    for i, layer in enumerate(hbc["layers"]):
-        if layer["kind"] == 1:
-            return i
-    return None
-
-
-def eye_centroid(hbc: dict, idx: int, frame: float) -> np.ndarray:
-    """眼睛图层顶点的质心（4K 像素坐标），用来把闭眼帧对齐到睁眼帧。"""
-    return posed_vertices(hbc["layers"][idx], hbc["frames"], frame).mean(axis=0)
-
-
-def detect_blink_frame(hbc: dict, idx: int, stride: int = 3) -> int:
-    """找「虹膜被眼皮盖住最多」的帧。
-
-    判据：在眼睛图层的 alpha 区域里数偏红紫的高饱和像素（虹膜）；闭眼时这些像素
-    被皮肤色的眼皮盖掉，占比最低。取最低的一段平台的中点，比直接取 argmin 稳。
-    """
-    frames = hbc["frames"]
-    src = hbc["layers"][idx]
-    layer = dict(src)
-    layer["verts"] = src["verts"].copy()
-    layer["verts"][:, :2] *= 0.25
-    layer["poses"] = (src["poses"].astype(np.float32) * 0.25).astype(np.int16)
-    w, h = 960, 540
-
-    scores = {}
-    for f in range(0, frames, stride):
-        rgba, alpha, _ = raster_layer(layer, frames, f, w, h, with_mask=False)
-        img = rgba[..., :3] / np.maximum(rgba[..., 3:4], 1e-6)
-        m = alpha > 0.6
-        if m.sum() < 50:
-            continue
-        r, g, b = img[..., 0], img[..., 1], img[..., 2]
-        iris = (r > 0.35) & (r > g * 1.25) & (b > g * 0.85) & m
-        scores[f] = float(iris.mean())
-
-    if not scores:
-        return frames // 2
-    vals = np.array(list(scores.values()))
-    lo, hi = float(vals.min()), float(vals.max())
-    thr = lo + max((hi - lo) * 0.15, 1e-5)
-    closed = sorted(f for f, v in scores.items() if v <= thr)
-    # 取「闭眼平台」里最靠中间的那一帧
-    pick = closed[len(closed) // 2]
-    print(f"    眨眼检测：最闭合的帧 {closed}, 取 {pick}（虹膜占比 {scores[pick]:.3f}，"
-          f"睁眼约 {hi:.3f}）")
-    return pick
-
-
-def build_eye_patch(hbc: dict, open_ratio: float, w: int, h: int, idx: int, closed: int) -> Image.Image:
-    """生成闭眼补丁：眼睛层用闭眼帧（平移到睁眼帧位置），其余图层保持睁眼帧。
-
-    返回一张与背景同画布、同归一化坐标的 RGBA：眼睛区域不透明，其余全透明。
-    着色器/绘制层在眨眼时把它按 alpha 叠上去即可，不会影响别的像素。
-    """
-    frames = hbc["frames"]
-    open_frame = open_ratio * (frames - 1)
-    delta = eye_centroid(hbc, idx, closed) - eye_centroid(hbc, idx, open_frame)
-    dx, dy = int(round(-delta[0])), int(round(-delta[1]))
-    closed_ratio = closed / (frames - 1)
-    char, *_ = bake_character(hbc, open_ratio, w, h, overrides={idx: (closed_ratio, (dx, dy))})
-
-    p = posed_vertices(hbc["layers"][idx], frames, open_frame)
-    pad = int(0.03 * w)
-    x0 = max(int(p[:, 0].min()) - pad, 0)
-    x1 = min(int(p[:, 0].max()) + pad, w)
-    y0 = max(int(p[:, 1].min()) - pad, 0)
-    y1 = min(int(p[:, 1].max()) + pad, h)
-
-    crop = char.crop((x0, y0, x1, y1))
-    cw = max(int(round((x1 - x0) / w * MASK_W)), 1)
-    ch = max(int(round((y1 - y0) / h * MASK_H)), 1)
-    small = crop.resize((cw, ch), Image.LANCZOS)
-
-    # 把裁剪边缘羽化成透明：补丁边界上残差最小，叠上去不会出现硬边
-    arr = np.asarray(small, np.float32).copy()
-    ramp = max(int(0.12 * min(cw, ch)), 4)
-    wx = np.clip(np.minimum(np.arange(cw), np.arange(cw)[::-1]) / ramp, 0, 1)
-    wy = np.clip(np.minimum(np.arange(ch), np.arange(ch)[::-1]) / ramp, 0, 1)
-    arr[..., 3] *= (wy[:, None] * wx[None, :])
-
-    patch = Image.new("RGBA", (MASK_W, MASK_H), (0, 0, 0, 0))
-    patch.paste(Image.fromarray(arr.astype(np.uint8), "RGBA"),
-                (int(round(x0 / w * MASK_W)), int(round(y0 / h * MASK_H))))
-    print(f"    闭眼补丁：帧 {closed}，平移 ({dx},{dy})px，区域 {cw}×{ch}")
-    return patch
 
 
 # ---------------------------------------------------------------- HBW（分层壁纸）
@@ -579,13 +461,8 @@ def gen_ganyu(ref: str, out: str) -> None:
 
 
 def gen_character_theme(ref: str, out: str, tid: str, bg_name: str, hbc_name: str,
-                        frame_ratio: float, hair_extra=None, ambient_softness: bool = True,
-                        blink: bool = False) -> None:
-    """八重神子 / 宵宫：把 .hbc 人物烤进背景，并生成人物/发丝遮罩。
-
-    blink=True 时再生成 `eyes.png`：闭眼补丁，供运行时做眨眼（.hbc 里本来就带
-    闭眼帧，只是我们静态烤图会丢掉它）。
-    """
+                        frame_ratio: float, hair_extra=None, ambient_softness: bool = True) -> None:
+    """八重神子 / 宵宫：把 .hbc 人物烤进背景，并生成人物/发丝遮罩。"""
     bg = Image.open(os.path.join(ref, bg_name)).convert("RGB")
     w, h = bg.size
     hbc = parse_hbc(os.path.join(ref, hbc_name))
@@ -603,14 +480,6 @@ def gen_character_theme(ref: str, out: str, tid: str, bg_name: str, hbc_name: st
     total = len(person[person > 0.02])
     print(f"  {tid}: 人物 {total / person.size * 100:.1f}%，发丝基础层 {veil.mean() * 100:.1f}%，"
           f"细缕层 {wave.mean() * 100:.1f}%")
-    if blink:
-        idx = eye_layer_index(hbc)
-        if idx is None:
-            print("    没有 kind==1 的眼睛图层，跳过眨眼补丁")
-            return
-        closed = detect_blink_frame(hbc, idx)
-        patch = build_eye_patch(hbc, frame_ratio, w, h, idx, closed)
-        patch.save(os.path.join(out, tid, "eyes.png"), optimize=True)
 
 
 def gen_yoimiya(ref: str, out: str) -> None:
@@ -738,7 +607,7 @@ def gen_shared(out: str) -> None:
 GENERATORS = {
     "ganyu": gen_ganyu,
     "yae": lambda ref, out: gen_character_theme(
-        ref, out, "yae", "yae-bg-4k.jpg", "yae-character.hbc", 0.33, blink=True),
+        ref, out, "yae", "yae-bg-4k.jpg", "yae-character.hbc", 0.33),
     "yoimiya": gen_yoimiya,
     "nahida": gen_nahida,
     "furina": gen_furina,

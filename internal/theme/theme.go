@@ -248,11 +248,6 @@ type Motion struct {
 	DriftAngle float64
 	// DriftSpeed 是漂移的相位速度倍率（1 = 标准，0 视为 0.05）。水慢、风快。
 	DriftSpeed float32
-	// Blink 是眨眼用的闭眼补丁（RGBA，与 Bg 同构图、同归一化坐标；空表示不眨眼）。
-	//
-	// 补丁只在不透明处生效，运行时按整张壁纸铺上去、用 alpha 淡入淡出，
-	// 所以不需要额外的位置参数。素材由 scripts/assetgen 从 `.hbc` 的闭眼帧烘出来。
-	Blink string
 }
 
 // Character 是一个角色主题包。
@@ -402,14 +397,10 @@ var all = []Character{
 		// 所以她的发丝权重是「数据驱动」的，不是手画椭圆。
 		//
 		// 环境漂移 0.0018：整幅都是虚化的樱色天空，风一吹整片花瓣都在走。
-		//
-		// 眨眼（Blink）：`.hbc` 里本来就有一段闭眼帧，生成资源时把「眼睛层用闭眼帧、
-		// 其余图层保持睁眼帧」烘成一张补丁。没有它，再大的位移也只是一张会晃的图。
 		Motion: Motion{
 			Person: "yae/person.png", Breath: 0.0022,
 			Hair: "yae/hair.png", Sway: 0.0032,
 			Ambient: "yae/ambient.png", Drift: 0.0022, DriftAngle: 0.45, DriftSpeed: 0.62,
-			Blink: "yae/eyes.png",
 		},
 	},
 	// 以下角色有自己的壁纸与专属 Motif（草叶 / 水滴 / 风纹）。
