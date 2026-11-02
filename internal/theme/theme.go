@@ -106,6 +106,22 @@ const (
 	ArtNone
 )
 
+// Opening 是开场动画的专属分镜。
+//
+// 参考项目每个角色一个 Opening：甘雨霜莲、宵宫金鱼烟火、八重神樱、
+// 纳西妲梦境圣所、芙宁娜水上舞台、珐露珊机关、钟离岩柱。
+type Opening uint8
+
+const (
+	OpeningGanyu Opening = iota
+	OpeningYoimiya
+	OpeningYae
+	OpeningNahida
+	OpeningFurina
+	OpeningFaruzan
+	OpeningZhongli
+)
+
 // Chrome 是窗口按钮（最小化 / 最大化 / 关闭）的造型。
 //
 // 参考项目每个角色都有一套和服饰、元素匹配的窗口按钮；这里按主题声明，
@@ -218,6 +234,8 @@ type Character struct {
 	SceneEN string
 	Element Element
 	Motif   Motif
+	// Opening 决定开场动画的专属分镜；绘制层按枚举分发，不认角色名。
+	Opening Opening
 	// Chrome 决定三个窗口按钮的造型；Ornament 决定侧栏、卡片上的角色纹样。
 	Chrome   Chrome
 	Ornament Ornament
@@ -307,7 +325,7 @@ var all = []Character{
 		ID: "ganyu", NameCN: "甘雨", NameEN: "Ganyu", Epithet: "循霜",
 		Motto: "循霜而行", Constellation: "S I N U S   U N I C O R N I S",
 		Scene: "璃月 · 海灯夜", SceneEN: "A QUIET MOMENT",
-		Element: Cryo, Motif: MotifCrystal, Chrome: ChromeCrystal, Ornament: OrnamentQingxin,
+		Element: Cryo, Motif: MotifCrystal, Opening: OpeningGanyu, Chrome: ChromeCrystal, Ornament: OrnamentQingxin,
 		WallTint: 0.15, Scrim: 0.32,
 		CardBg: ui.Hex("#14314A"), Art: ArtNone,
 		Bg: "ganyu/bg.jpg", Icon: "ganyu/icon.png", Tok: ganyuTokens(),
@@ -333,7 +351,7 @@ var all = []Character{
 		ID: "yoimiya", NameCN: "宵宫", NameEN: "Yoimiya", Epithet: "烟火",
 		Motto: "琉焰华舞", Constellation: "C A R A S S I U S   A U R A T U S",
 		Scene: "稻妻 · 夏祭", SceneEN: "FIREWORKS AT DUSK",
-		Element: Pyro, Motif: MotifFlame, Chrome: ChromePyro, Ornament: OrnamentGoldfish,
+		Element: Pyro, Motif: MotifFlame, Opening: OpeningYoimiya, Chrome: ChromePyro, Ornament: OrnamentGoldfish,
 		WallTint: 0.18, Scrim: 0.47,
 		CardBg: ui.Hex("#3E2418"), Art: ArtNone,
 		Bg: "yoimiya/bg.jpg", Tok: yoimiyaTokens(),
@@ -342,7 +360,7 @@ var all = []Character{
 		ID: "yae", NameCN: "八重神子", NameEN: "Yae Miko", Epithet: "神樱",
 		Motto: "浮世笑百姿", Constellation: "D I V I N A   V U L P E S",
 		Scene: "鸣神 · 神樱", SceneEN: "SACRED SAKURA",
-		Element: Electro, Motif: MotifBolt, Chrome: ChromeElectro, Ornament: OrnamentSakura,
+		Element: Electro, Motif: MotifBolt, Opening: OpeningYae, Chrome: ChromeElectro, Ornament: OrnamentSakura,
 		WallTint: 0.15, Scrim: 0.66,
 		CardBg: ui.Hex("#37203F"), Art: ArtNone,
 		Bg: "yae/bg.jpg", Tok: yaeTokens(),
@@ -352,7 +370,7 @@ var all = []Character{
 		ID: "nahida", NameCN: "纳西妲", NameEN: "Nahida", Epithet: "新芽",
 		Motto: "白草净华", Constellation: "S A P I E N T I A   O R O M A S D I S",
 		Scene: "须弥 · 世界树", SceneEN: "DREAM OF WISDOM",
-		Element: Dendro, Motif: MotifLeaf, Chrome: ChromeDendro, Ornament: OrnamentSprig,
+		Element: Dendro, Motif: MotifLeaf, Opening: OpeningNahida, Chrome: ChromeDendro, Ornament: OrnamentSprig,
 		WallTint: 0.15, Scrim: 0.66,
 		CardBg: ui.Hex("#1F3A22"), Art: ArtNone,
 		Bg: "nahida/bg.jpg", Tok: derive(ui.Hex("#A8E6A0")),
@@ -361,7 +379,7 @@ var all = []Character{
 		ID: "furina", NameCN: "芙宁娜", NameEN: "Furina", Epithet: "水幕",
 		Motto: "不休独舞", Constellation: "A N I M U L A   C H O R A G I",
 		Scene: "枫丹 · 歌剧院", SceneEN: "THE STAGE AWAITS",
-		Element: Hydro, Motif: MotifWave, Chrome: ChromeHydro, Ornament: OrnamentTopHat,
+		Element: Hydro, Motif: MotifWave, Opening: OpeningFurina, Chrome: ChromeHydro, Ornament: OrnamentTopHat,
 		WallTint: 0.14, Scrim: 0.35,
 		CardBg: ui.Hex("#15294A"), Art: ArtNone,
 		Bg: "furina/bg.jpg", Tok: derive(ui.Hex("#8FD0FF")),
@@ -370,7 +388,7 @@ var all = []Character{
 		ID: "faruzan", NameCN: "珐露珊", NameEN: "Faruzan", Epithet: "风卷",
 		Motto: "百巧千机", Constellation: "F L O S C U L I   I M P L E X I",
 		Scene: "须弥 · 教令院", SceneEN: "MACHINA OF WISDOM",
-		Element: Anemo, Motif: MotifWind, Chrome: ChromeAnemo, Ornament: OrnamentPolyhedron,
+		Element: Anemo, Motif: MotifWind, Opening: OpeningFaruzan, Chrome: ChromeAnemo, Ornament: OrnamentPolyhedron,
 		WallTint: 0.16, Scrim: 0.47,
 		CardBg: ui.Hex("#17342F"), Art: ArtNone,
 		Bg: "faruzan/bg.jpg", Tok: derive(ui.Hex("#9EE8D6")),
@@ -381,7 +399,7 @@ var all = []Character{
 		ID: "zhongli", NameCN: "钟离", NameEN: "Zhongli", Epithet: "岩契",
 		Motto: "尘世闲游", Constellation: "L A P I S   D E I",
 		Scene: "璃月 · 孤云阁", SceneEN: "STONE HARBOUR",
-		Element: Geo, Motif: MotifGeo, Chrome: ChromeGeo, Ornament: OrnamentStoneSeal,
+		Element: Geo, Motif: MotifGeo, Opening: OpeningZhongli, Chrome: ChromeGeo, Ornament: OrnamentStoneSeal,
 		WallTint: 0.18, Scrim: 0.62,
 		CardBg: ui.Hex("#392C14"), Art: ArtNone,
 		Bg: "zhongli/bg.jpg", Tok: zhongliTokens(),

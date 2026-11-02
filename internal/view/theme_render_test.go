@@ -5,6 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/intro"
 	"bestuav-hanabi/internal/theme"
 )
 
@@ -33,6 +34,37 @@ func TestCharacterThemesRender(t *testing.T) {
 		}
 		if lit < 1000 {
 			t.Errorf("%s 渲染过于空：亮像素只有 %d", ch.ID, lit)
+		}
+	}
+}
+
+// TestOpeningsRender 七个角色的开场分镜在几个关键时间点都能画出来。
+func TestOpeningsRender(t *testing.T) {
+	for _, ch := range theme.All() {
+		for _, tm := range []float32{0.8, 1.8, 3.2, 4.9} {
+			a := NewApp()
+			a.introDone = true
+			a.setCharacter(ch.ID)
+			a.finishSwitch()
+			a.intro = intro.New(320, 200)
+			a.intro.T = tm
+			img := ui.NewTester(func(c *ui.Context) {
+				ui.Column(c).Fill().Background(ui.Hex("#080D14")).Draw(func(p *ui.Painter, r ui.Rect) {
+					a.drawIntro(p, r)
+				})
+			}, 320, 200).Image()
+			if img == nil {
+				t.Fatalf("%s t=%.1f 开场渲染失败", ch.ID, tm)
+			}
+			lit := 0
+			for i := 0; i+3 < len(img.Pix); i += 4 {
+				if img.Pix[i] > 40 || img.Pix[i+1] > 40 || img.Pix[i+2] > 40 {
+					lit++
+				}
+			}
+			if lit < 300 {
+				t.Errorf("%s t=%.1f 开场过于空：亮像素 %d", ch.ID, tm, lit)
+			}
 		}
 	}
 }

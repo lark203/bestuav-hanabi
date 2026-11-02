@@ -105,14 +105,15 @@ func TestThemeEffects(t *testing.T) {
 	want := map[string]struct {
 		chrome   Chrome
 		ornament Ornament
+		opening  Opening
 	}{
-		"ganyu":   {ChromeCrystal, OrnamentQingxin},
-		"yoimiya": {ChromePyro, OrnamentGoldfish},
-		"yae":     {ChromeElectro, OrnamentSakura},
-		"nahida":  {ChromeDendro, OrnamentSprig},
-		"furina":  {ChromeHydro, OrnamentTopHat},
-		"faruzan": {ChromeAnemo, OrnamentPolyhedron},
-		"zhongli": {ChromeGeo, OrnamentStoneSeal},
+		"ganyu":   {ChromeCrystal, OrnamentQingxin, OpeningGanyu},
+		"yoimiya": {ChromePyro, OrnamentGoldfish, OpeningYoimiya},
+		"yae":     {ChromeElectro, OrnamentSakura, OpeningYae},
+		"nahida":  {ChromeDendro, OrnamentSprig, OpeningNahida},
+		"furina":  {ChromeHydro, OrnamentTopHat, OpeningFurina},
+		"faruzan": {ChromeAnemo, OrnamentPolyhedron, OpeningFaruzan},
+		"zhongli": {ChromeGeo, OrnamentStoneSeal, OpeningZhongli},
 	}
 	for id, w := range want {
 		c, ok := ByID(id)
@@ -125,6 +126,9 @@ func TestThemeEffects(t *testing.T) {
 		}
 		if c.Ornament != w.ornament {
 			t.Errorf("%s 的 Ornament 应为 %d，实际 %d", id, w.ornament, c.Ornament)
+		}
+		if c.Opening != w.opening {
+			t.Errorf("%s 的 Opening 应为 %d，实际 %d", id, w.opening, c.Opening)
 		}
 	}
 }
