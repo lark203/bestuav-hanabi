@@ -1,11 +1,11 @@
-// Package wallpaper 把静态插画渲染成"局部在流动"的动态壁纸，并按主题染色。
+// Package wallpaper 把静态插画渲染成"人物在呼吸、发丝在飘"的动态壁纸。
 //
-// 模型与参考项目（HanaBi-ui-Genshin 的 LayeredWallpaper）一致：一张图 + 多层
-// 遮罩限制的局部形变，形变后仍采样同一张图。人物主体不动，只有遮罩内（发丝等）
-// 在流动。不用"叠第二张图"的做法——那会产生双影。
+// 硬约束：建筑、天空完全不动。靠人物轮廓遮罩（Person）当总闸门实现——
+// 它以外的地方严格等于原图，不产生任何位移。
 //
-// 分层次（一缕一缕分开飘）靠的是遮罩本身：整片发区一层、两处局部各一层，
-// 三层用不同的空间频率与方向累加，相邻发缕的位移量因此不同。
+// 模型取自参考项目（HanaBi-ui-Genshin）background.cpp 的 shake 分支：
+// 先按遮罩混合"原始采样"与"位移后采样"的颜色，而不是位移 UV。
+// 这样遮罩外一个量化误差都不会有。
 package wallpaper
 
 import (
@@ -22,25 +22,29 @@ var source string
 // 好处是错误在启动时就暴露，而不是等某次绘制静默不出图。
 var fx = shader.MustCompile(source)
 
-// Flow 是驱动局部流动的素材：一张整片遮罩、两层局部细缕遮罩，加一个主方向。
+// Flow 是局部动态的素材。
 //
-// 三层覆盖范围逐级收窄（实测甘雨：整片 9.51%、下侧一缕 1.08%、顶部一缕 1.57%），
-// 三层相乘累加后，细缕处比周围多一份位移，于是看起来是一缕一缕分开飘。
+// Person 是人物区域遮罩（灰度，非零处才动）——它是闸门，决定"谁能动"。
+// 甘雨实测覆盖 x 34.2%~59.4% / y 22.2%~73.7%，一条竖直的人形带，仅 4.9%。
 //
-// WaveA / WaveB 可为 nil：未绑定读为透明，该层自动不参与，退化成单层。
+// Veil 是发丝基础层（可选，整片发区），Wave 是细缕层（可选）。
+// 两者都会被 Person 裁到人物之内——这正是"建筑天空不动"的保证。
+// 未绑定（nil）读为透明，该层自动不参与。
 type Flow struct {
-	Mask     *ui.Bitmap // 整片区域（基础层）
-	WaveA    *ui.Bitmap // 局部细缕（可选）
-	WaveB    *ui.Bitmap // 局部细缕（可选）
-	Dir      ui.Point   // 主方向（单位向量，y 向下）；零值按 (1,0)
-	Strength float32    // 基础层最大位移，图片 UV（0.01 = 图宽的 1%）
+	Person *ui.Bitmap // 人物区域（闸门，必需）
+	Veil   *ui.Bitmap // 发丝基础层（可选）
+	Wave   *ui.Bitmap // 发丝细缕层（可选）
+	// Breath 是呼吸幅度（图片 UV 的垂直分量）；0 = 不呼吸。
+	Breath float32
+	// Sway 是发丝飘动幅度（图片 UV）；0 = 发丝不动。
+	Sway float32
 }
 
 // Draw 在 r 处绘制壁纸。
 //
-//   - t 为动效秒数，play 为流动强度 0..1（0 = 静止）；
+//   - t 为动效秒数，play 为动效强度 0..1（0 = 静止）；
 //   - tint 是主题的元素色，amount 是染色比例 0..1（0 = 原色）；
-//   - flow 是可选的局部流动素材，nil 表示该主题不流动（其余主题走不到形变分支）。
+//   - flow 是可选的局部动态素材，nil 表示该主题完全静态。
 //
 // 染色在着色器里做（保亮度），所以换主题时壁纸的暗部不会发灰——
 // 这一点用半透明色层覆盖做不到。
@@ -48,28 +52,23 @@ func Draw(p *ui.Painter, bg *ui.Bitmap, r ui.Rect, t float64, play float32, tint
 	if bg == nil || r.W <= 0 || r.H <= 0 {
 		return
 	}
-	strength := float32(0)
-	dir := ui.Point{X: 1, Y: 0}
-	var mask, waveA, waveB *ui.Bitmap
-	if flow != nil && flow.Mask != nil {
-		strength = flow.Strength
-		mask, waveA, waveB = flow.Mask, flow.WaveA, flow.WaveB
-		if flow.Dir.X != 0 || flow.Dir.Y != 0 {
-			dir = flow.Dir
-		}
+	var person, veil, wave *ui.Bitmap
+	var breath, sway float32
+	if flow != nil && flow.Person != nil {
+		person, veil, wave = flow.Person, flow.Veil, flow.Wave
+		breath, sway = flow.Breath, flow.Sway
 	}
-	// image0=背景，image1=整片遮罩，image2/image3=两层细缕；空缺槽位读透明。
-	// FlowDir 要传 [2]float32：shader 的 vec 型 uniform 只收数字数组或 ui.Color，
-	// 传 ui.Point 会在设值时 panic（"not a number, numbers or a ui.Color"）。
+	// image0=背景，image1=人物闸门，image2=发丝基础层，image3=发丝细缕。
+	// 空缺槽位读透明（权重 0），对应层自动不参与。
 	fx.Draw(p, r, shader.Options{
 		Uniforms: map[string]any{
-			"Time":         t,
-			"Play":         play,
-			"Tint":         tint,
-			"TintAmount":   amount,
-			"FlowStrength": strength,
-			"FlowDir":      [2]float32{dir.X, dir.Y},
+			"Time":           t,
+			"Play":           play,
+			"Tint":           tint,
+			"TintAmount":     amount,
+			"BreathStrength": breath,
+			"FlowStrength":   sway,
 		},
-		Images: [4]*ui.Bitmap{bg, mask, waveA, waveB},
+		Images: [4]*ui.Bitmap{bg, person, veil, wave},
 	})
 }

@@ -56,24 +56,27 @@ func NewApp() *App {
 	return &App{char: c, tok: c.Tok, page: "library", t0: time.Now(), animPlay: 1, filter: -1}
 }
 
-// wallpaperFlow 构造当前主题的局部流动素材；仅带流动图层的角色（甘雨）返回非空。
+// wallpaperFlow 构造当前主题的壁纸动态素材；没有人形遮罩的角色返回 nil（完全静态）。
 //
-// 遮罩走 assets 缓存（缺图返回 nil，壁纸退化为静态，不会报错）。
-// 细缕层缺图时留 nil，着色器把空槽读为透明，该层自动不参与。
+// 各遮罩走 assets 缓存（缺图返回 nil，对应层自动不参与或整体退化为静态）。
 func (a *App) wallpaperFlow() *wallpaper.Flow {
-	if a.char.FlowMask == "" {
+	if a.char.PersonMask == "" {
 		return nil
 	}
-	mask := assets.Bitmap(a.char.FlowMask)
-	if mask == nil {
+	person := assets.Bitmap(a.char.PersonMask)
+	if person == nil {
 		return nil
 	}
-	f := &wallpaper.Flow{Mask: mask, Dir: a.char.FlowDir, Strength: a.char.FlowStrength}
-	if a.char.FlowWaveA != "" {
-		f.WaveA = assets.Bitmap(a.char.FlowWaveA)
+	f := &wallpaper.Flow{
+		Person: person,
+		Breath: a.char.PersonBreath,
+		Sway:   a.char.HairSway,
 	}
-	if a.char.FlowWaveB != "" {
-		f.WaveB = assets.Bitmap(a.char.FlowWaveB)
+	if a.char.HairVeil != "" {
+		f.Veil = assets.Bitmap(a.char.HairVeil)
+	}
+	if a.char.HairWave != "" {
+		f.Wave = assets.Bitmap(a.char.HairWave)
 	}
 	return f
 }
@@ -86,9 +89,9 @@ func (a *App) setCharacter(id string) {
 	}
 	a.char = c
 	a.tok = c.Tok
-	// 释放上一套的壁纸/头像/流动遮罩像素：每张 4K 约 33MB，六套全留着会到 200MB。
+	// 释放上一套的壁纸/头像/动态遮罩像素：每张 4K 约 33MB，六套全留着会到 200MB。
 	keep := []string{c.Bg, c.Icon}
-	for _, p := range []string{c.FlowMask, c.FlowWaveA, c.FlowWaveB} {
+	for _, p := range []string{c.PersonMask, c.HairVeil, c.HairWave} {
 		if p != "" {
 			keep = append(keep, p)
 		}
