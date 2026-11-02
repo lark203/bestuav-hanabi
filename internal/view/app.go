@@ -288,20 +288,32 @@ func (a *App) finishSwitch() {
 }
 
 // themeProgress 返回主题切换进度 0..1；到 1 时顺手收尾。
+//
+// 曲线用临界阻尼弹簧（参考项目 springs::S_CRIT：4Hz、ζ=1）的阶跃响应，
+// 而不是 smootherstep：弹簧起步快、收尾慢，看起来像"镜头推过去"，
+// 线性/smootherstep 的匀速叠化才是"生硬"的来源。
 func (a *App) themeProgress(now time.Time) float32 {
 	if !a.switching {
 		return 1
 	}
-	k := float32(now.Sub(a.switchAt).Seconds() * 1000 / float64(themeFade/time.Millisecond))
-	if k >= 1 {
+	elapsed := now.Sub(a.switchAt).Seconds()
+	if elapsed >= themeFade.Seconds() {
 		a.finishSwitch()
 		return 1
 	}
-	if k < 0 {
-		k = 0
+	if elapsed <= 0 {
+		return 0
 	}
-	// smootherstep，和开场/页面动效保持一致。
-	return k * k * k * (k*(k*6-15) + 10)
+	return springProgress(elapsed)
+}
+
+// springProgress 是临界阻尼弹簧的阶跃响应：1 - e^(-wt)(1+wt)。
+//
+// w = 2π·4Hz，与参考项目 S_CRIT 一致：0.2s 到 96%，0.42s 到 99.9%。
+func springProgress(t float64) float32 {
+	const w = 2 * 3.141592653589793 * 4.0
+	k := 1 - math.Exp(-w*t)*(1+w*t)
+	return float32(k)
 }
 
 // pageProgress 返回当前页入场进度 0..1。
@@ -422,12 +434,19 @@ func (a *App) View(c *ui.Context) {
 		fromFlow = a.wallpaperFlow()
 	}
 
+	// 取景（zoom + 焦点）：新旧两层共用同一个镜头，切换时从旧取景推到新取景。
+	// 这是"从后到前 / 从前到后"的来源——只叠化画面是平的，镜头动起来才有纵深。
+	cam := framingOf(fromChar)
+	if a.switching {
+		cam = cam.Mix(framingOf(a.char), k)
+	}
+
 	// 壁纸画在根容器的 Draw 回调里：它在自身背景之后、子元素之前执行，
 	// 所以 UI 天然压在壁纸上，不需要额外的层叠容器。
 	root := ui.Column(c).Fill().Background(a.tok.WinFill)
 	if fromBg != nil {
 		root = root.Draw(func(p *ui.Painter, r ui.Rect) {
-			a.drawWallpaper(p, r, fromChar, fromBg, fromFlow, fromTok, p.Now())
+			a.drawWallpaper(p, r, fromChar, fromBg, fromFlow, fromTok, p.Now(), cam)
 		})
 	}
 
@@ -441,7 +460,7 @@ func (a *App) View(c *ui.Context) {
 				flow := a.wallpaperFlow()
 				ui.Box(c).Fill().Opacity(k).
 					Draw(func(p *ui.Painter, r ui.Rect) {
-						a.drawWallpaper(p, r, a.char, bg, flow, a.char.Tok, p.Now())
+						a.drawWallpaper(p, r, a.char, bg, flow, a.char.Tok, p.Now(), cam)
 					})
 			}
 		}
@@ -479,13 +498,19 @@ func (a *App) View(c *ui.Context) {
 	}
 }
 
+// framingOf 把角色主题的取景转成着色器参数。
+func framingOf(c theme.Character) wallpaper.Framing {
+	return wallpaper.Framing{Zoom: c.Zoom, FocusX: c.FocusX, FocusY: c.FocusY}
+}
+
 // drawWallpaper 画一层壁纸：着色器 + 按壁纸亮度压暗 + 顶部渐变 + 环境粒子。
 //
 // 过渡时旧、新两层各画一次，新层靠 Element.Opacity 淡入。壁纸显现
 // （settings.WallpaperVis）叠加到角色自带的 Scrim 上，两层各自算。
+// cam 是共享的取景（过渡时由新旧两个角色插值而来）。
 func (a *App) drawWallpaper(p *ui.Painter, r ui.Rect, ch theme.Character,
-	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, now time.Time) {
-	a.drawWallpaperAt(p, r, ch, bg, flow, tok, now.Sub(a.t0).Seconds())
+	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, now time.Time, cam wallpaper.Framing) {
+	a.drawWallpaperAt(p, r, ch, bg, flow, tok, now.Sub(a.t0).Seconds(), cam)
 }
 
 // drawWallpaperAt 同上，但动效时间是显式传入的秒数。
@@ -493,10 +518,17 @@ func (a *App) drawWallpaper(p *ui.Painter, r ui.Rect, ch theme.Character,
 // 拆出来是为了截图/回归测试能钉住某一时刻——离屏渲染一帧要几秒，用真时钟
 // 会把动效推进一大截，两张图之间根本对不上。
 func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch theme.Character,
-	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, elapsed float64) {
-	// 着色器驱动：Cover 铺满 + 按角色元素色保亮度染色；
+	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, elapsed float64, cam wallpaper.Framing) {
+	// 着色器驱动：取景（zoom + 焦点）+ 按角色元素色保亮度染色；
 	// 人物、发丝、环境三层遮罩决定"谁能动"。
-	wallpaper.Draw(p, bg, r, elapsed, a.animPlay, tok.Accent, ch.WallTint, flow)
+	wallpaper.Draw(p, bg, r, wallpaper.Options{
+		Time:       elapsed,
+		Play:       a.animPlay,
+		Tint:       tok.Accent,
+		TintAmount: ch.WallTint,
+		Flow:       flow,
+		Framing:    cam,
+	})
 
 	scrim := a.settings.EffectiveScrim(ch.Scrim)
 	p.Fill(r, ui.RGBA(6, 12, 22, scrim), 0) // 按壁纸亮度压暗（见 Character.Scrim）

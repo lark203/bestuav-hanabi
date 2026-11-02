@@ -53,41 +53,89 @@ type Flow struct {
 	DriftSpeed float32
 }
 
-// Draw 在 r 处绘制壁纸。
+// Framing 是取景：Zoom 越大裁得越紧，Focus 是落在窗口中心的图片坐标（0..1）。
 //
-//   - t 为动效秒数，play 为动效强度 0..1（0 = 静止）；
-//   - tint 是主题的元素色，amount 是染色比例 0..1（0 = 原色）；
-//   - flow 是可选的动态素材，nil 表示该主题完全静态。
+// 参考项目给每个角色配了不同的取景（zoom 1.02~1.22、focusX 0.40~0.62），
+// 切换主题时镜头会从旧取景推拉到新取景——这就是"从后到前 / 从前到后"的来源。
+// 零值表示不缩放、居中。
+type Framing struct {
+	Zoom   float32
+	FocusX float32
+	FocusY float32
+}
+
+// Norm 把零值补成默认取景（zoom 1、居中），避免调用方到处判零。
+func (f Framing) Norm() Framing {
+	if f.Zoom <= 0 {
+		f.Zoom = 1
+	}
+	if f.FocusX <= 0 {
+		f.FocusX = 0.5
+	}
+	if f.FocusY <= 0 {
+		f.FocusY = 0.5
+	}
+	return f
+}
+
+// Mix 在两个取景之间插值（k=0 取 a，k=1 取 b）。
+func (f Framing) Mix(to Framing, k float32) Framing {
+	a, b := f.Norm(), to.Norm()
+	return Framing{
+		Zoom:   a.Zoom + (b.Zoom-a.Zoom)*k,
+		FocusX: a.FocusX + (b.FocusX-a.FocusX)*k,
+		FocusY: a.FocusY + (b.FocusY-a.FocusY)*k,
+	}
+}
+
+// Options 是一次壁纸绘制的全部参数。
+type Options struct {
+	// Time 是动效秒数，Play 是动效强度 0..1（0 = 静止）。
+	Time float64
+	Play float32
+	// Tint 是主题元素色，TintAmount 是染色比例 0..1（0 = 原色）。
+	Tint       ui.Color
+	TintAmount float32
+	// Flow 是可选的动态素材，nil 表示该主题完全静态。
+	Flow *Flow
+	// Framing 是取景（缩放与焦点）。
+	Framing Framing
+}
+
+// Draw 在 r 处按 o 绘制壁纸。
 //
 // 染色在着色器里做（保亮度），所以换主题时壁纸的暗部不会发灰——
 // 这一点用半透明色层覆盖做不到。
-func Draw(p *ui.Painter, bg *ui.Bitmap, r ui.Rect, t float64, play float32, tint ui.Color, amount float32, flow *Flow) {
+func Draw(p *ui.Painter, bg *ui.Bitmap, r ui.Rect, o Options) {
 	if bg == nil || r.W <= 0 || r.H <= 0 {
 		return
 	}
 	var person, hair, ambient *ui.Bitmap
 	var breath, sway, drift, speed float32
 	dir := [2]float32{1, 0}
-	if flow != nil {
-		person, hair, ambient = flow.Person, flow.Hair, flow.Ambient
-		breath, sway, drift, speed = flow.Breath, flow.Sway, flow.Drift, flow.DriftSpeed
-		if flow.DriftDir != [2]float32{} {
-			dir = flow.DriftDir
+	if o.Flow != nil {
+		person, hair, ambient = o.Flow.Person, o.Flow.Hair, o.Flow.Ambient
+		breath, sway, drift, speed = o.Flow.Breath, o.Flow.Sway, o.Flow.Drift, o.Flow.DriftSpeed
+		if o.Flow.DriftDir != [2]float32{} {
+			dir = o.Flow.DriftDir
 		}
 	}
+	f := o.Framing.Norm()
 	// image0=背景，image1=人物闸门，image2=发丝（R/G 两层），image3=环境。
 	// 空缺槽位读透明（权重 0），对应层自动不参与。
 	fx.Draw(p, r, shader.Options{
 		Uniforms: map[string]any{
-			"Time":           t,
-			"Play":           play,
-			"Tint":           tint,
-			"TintAmount":     amount,
+			"Time":           o.Time,
+			"Play":           o.Play,
+			"Tint":           o.Tint,
+			"TintAmount":     o.TintAmount,
 			"BreathStrength": breath,
 			"FlowStrength":   sway,
 			"DriftStrength":  drift,
 			"DriftDir":       dir[:],
 			"DriftSpeed":     speed,
+			"Zoom":           f.Zoom,
+			"Focus":          []float32{f.FocusX, f.FocusY},
 		},
 		Images: [4]*ui.Bitmap{bg, person, hair, ambient},
 	})

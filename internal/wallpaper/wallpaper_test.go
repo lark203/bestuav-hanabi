@@ -48,7 +48,9 @@ func render(t *testing.T, bg *ui.Bitmap, flow *Flow, time float64, play float32)
 	t.Helper()
 	return ui.NewTester(func(c *ui.Context) {
 		ui.Column(c).Fill().Draw(func(p *ui.Painter, r ui.Rect) {
-			Draw(p, bg, r, time, play, ui.Hex("#7FD7FF"), 0, flow)
+			Draw(p, bg, r, Options{
+				Time: time, Play: play, Tint: ui.Hex("#7FD7FF"), Flow: flow,
+			})
 		})
 	}, testW, testH).Image()
 }

@@ -62,7 +62,7 @@ func TestRandomStartup(t *testing.T) {
 	}
 }
 
-// TestThemeTransition 0.42 秒过渡：中点未完成、超时后收尾。
+// TestThemeTransition 0.42 秒过渡：弹簧曲线前段快、超时后收尾。
 func TestThemeTransition(t *testing.T) {
 	base := time.Now()
 	a := NewApp()
@@ -73,9 +73,15 @@ func TestThemeTransition(t *testing.T) {
 	if !a.switching {
 		t.Fatal("切换主题后应进入过渡")
 	}
-	a.switchAt = base.Add(-210 * time.Millisecond)
-	if k := a.themeProgress(base); k <= 0.05 || k >= 0.95 {
-		t.Errorf("0.21s 时应过渡到一半，实际 k=%.3f", k)
+	// 弹簧不是匀速：0.1s 就已经过半（匀速只有 0.24），这正是换成弹簧的目的。
+	a.switchAt = base.Add(-100 * time.Millisecond)
+	if k := a.themeProgress(base); k <= 0.5 || k >= 0.95 {
+		t.Errorf("0.10s 时应已过半但未完成，实际 k=%.3f", k)
+	}
+	// 到 0.30s 应该基本到位，但还没收尾。
+	a.switchAt = base.Add(-300 * time.Millisecond)
+	if k := a.themeProgress(base); k <= 0.95 || k >= 1 {
+		t.Errorf("0.30s 时应接近完成，实际 k=%.3f", k)
 	}
 	a.switchAt = base.Add(-500 * time.Millisecond)
 	if k := a.themeProgress(base); k != 1 {
