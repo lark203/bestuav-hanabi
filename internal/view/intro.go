@@ -153,6 +153,12 @@ func (a *App) drawMark(p *ui.Painter, pose intro.MarkPose, fade float32) {
 		drawBoltMark(p, a.intro, pose, fade, a.tok.Accent)
 	case theme.MotifGeo:
 		drawGeoMark(p, a.intro, pose, fade, a.tok.Accent)
+	case theme.MotifLeaf:
+		drawLeafMark(p, a.intro, pose, fade, a.tok.Accent)
+	case theme.MotifWave:
+		drawWaveMark(p, a.intro, pose, fade, a.tok.Accent)
+	case theme.MotifWind:
+		drawWindMark(p, a.intro, pose, fade, a.tok.Accent)
 	default:
 		drawCrystalMark(p, a.intro, pose, fade, a.tok.Accent)
 	}
@@ -377,9 +383,136 @@ func drawGeoMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float
 	circle(p, x, y, rad*0.07, ui.Hex("#FFFCF0").Alpha(al*0.9))
 }
 
+// drawLeafMark 画草元素标识：三片叶子从同一中心抽枝展开 + 短茎 + 芽心。
+func drawLeafMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+	al := pose.Opacity * fade
+	if al <= 0.004 || pose.Radius <= 0.5 {
+		return
+	}
+	x, y, rad := pose.X, pose.Y, pose.Radius
+
+	grow := intro.Smooth(in.T, 0.25, 1.35)
+	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
+	bloom := intro.Smooth(in.T, 3.20, 3.95)
+
+	glow(p, x, y, rad*(1.7+0.5*bloom), accent, al*(0.34+0.42*bloom))
+	green := accent.Mix(ui.Hex("#F4FFD8"), 0.55)
+	w := max32(1.4, rad*0.045)
+
+	for i, ang := range []float64{-math.Pi / 2, -math.Pi/2 - .88, -math.Pi/2 + .88} {
+		g := intro.Smooth(in.T, 0.28+float32(i)*0.13, 1.10+float32(i)*0.13)
+		length := rad * 0.96 * g
+		width := rad * 0.26 * g
+		petal(p, x, y, float32(ang)+float32(turn)*0.5, length, width, w, green.Alpha(al*0.92))
+	}
+
+	// 茎与芽心：让三片叶子看起来是长出来的。
+	stem := rad * (0.30 + 0.42*grow)
+	seg(p, x, y, x, y+stem, w*0.8, green.Alpha(al*0.70))
+	glow(p, x, y, rad*0.30, ui.Hex("#F4FFD8"), al*0.80)
+	circle(p, x, y, max32(.9, rad*0.055), ui.Hex("#F8FFE8").Alpha(al*0.92))
+
+	// 几粒飘散的种子，给成形一点空气感。
+	for i := 0; i < 7; i++ {
+		a := float64(turn)*2.0 + float64(i)*tau/7
+		rr := rad * (0.45 + 0.45*grow)
+		px := x + rr*float32(math.Cos(a))
+		py := y + rr*float32(math.Sin(a)) - rad*0.20*bloom
+		circle(p, px, py, max32(.6, rad*0.018), green.Alpha(al*0.35*(1-bloom*0.4)))
+	}
+}
+
+// drawWaveMark 画水元素标识：水滴升起 + 三圈扩散的水纹。
+func drawWaveMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+	al := pose.Opacity * fade
+	if al <= 0.004 || pose.Radius <= 0.5 {
+		return
+	}
+	x, y, rad := pose.X, pose.Y, pose.Radius
+
+	grow := intro.Smooth(in.T, 0.22, 1.25)
+	settle := intro.Smooth(in.T, 3.10, 4.00)
+
+	glow(p, x, y, rad*(1.7+0.45*settle), accent, al*(0.34+0.40*settle))
+	blue := accent.Mix(ui.Hex("#EAF8FF"), 0.58)
+	w := max32(1.4, rad*0.045)
+
+	// 水滴从下方浮起，最后停住。
+	dy := (1 - grow) * rad * 0.30
+	droplet(p, x, y+dy, rad*0.58*grow, blue.Alpha(al*0.92))
+
+	// 水纹：三圈从水滴下方扩散，越远越淡。
+	centerY := y + rad*0.58
+	for i := 0; i < 3; i++ {
+		k := intro.Smooth(in.T, 0.95+float32(i)*0.42, 3.10+float32(i)*0.42)
+		rr := rad * (0.42 + 0.95*k)
+		col := blue.Alpha(al * 0.55 * (1 - k) * (0.6 + 0.4*settle))
+		arcLine(p, x, centerY, rr, math.Pi*0.12, math.Pi*0.88, w*0.8, col)
+	}
+
+	// 成形后仍保留两道水波，避免最终只剩一颗孤立的水滴。
+	for i := 0; i < 2; i++ {
+		wy := y + rad*(0.54+float32(i)*0.14)
+		curveLine(p, x-rad*0.55, wy, x-rad*0.24, wy-rad*0.09,
+			x+rad*0.24, wy+rad*0.09, x+rad*0.55, wy, blue.Alpha(al*0.55), w*0.7)
+	}
+
+	// 几颗悬浮的小水珠。
+	for i := 0; i < 6; i++ {
+		a := float64(i)*tau/6 + float64(in.T)*0.35
+		rr := rad * (0.60 + 0.28*grow)
+		px := x + rr*float32(math.Cos(a))
+		py := y - rad*0.08 + rr*0.42*float32(math.Sin(a))
+		circle(p, px, py, max32(.6, rad*0.018), blue.Alpha(al*0.45))
+	}
+}
+
+// drawWindMark 画风元素标识：三道回旋气流 + 甩出的尾迹 + 中心风眼。
+func drawWindMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+	al := pose.Opacity * fade
+	if al <= 0.004 || pose.Radius <= 0.5 {
+		return
+	}
+	x, y, rad := pose.X, pose.Y, pose.Radius
+
+	grow := intro.Smooth(in.T, 0.20, 1.30)
+	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
+	gust := intro.Smooth(in.T, 3.10, 4.00)
+
+	glow(p, x, y, rad*(1.8+0.4*gust), accent, al*(0.34+0.38*gust))
+	teal := accent.Mix(ui.Hex("#F2FFF8"), 0.55)
+	w := max32(1.4, rad*0.042)
+
+	for i := 0; i < 3; i++ {
+		r := rad * (0.90 - 0.19*float32(i)) * grow
+		a0 := float64(turn)*math.Pi*1.2 + float64(i)*tau/3 + float64(gust)*0.5
+		arcLine(p, x, y, r, a0, a0+math.Pi*1.5, w*(1-float32(i)*0.18),
+			teal.Alpha(al*(0.92-0.20*float32(i))))
+		// 外圈起点甩出一条短尾。
+		tx := x + r*float32(math.Cos(a0))
+		ty := y + r*float32(math.Sin(a0))
+		seg(p, tx, ty, tx-float32(math.Cos(a0))*rad*0.26, ty-float32(math.Sin(a0))*rad*0.26,
+			w*0.8, teal.Alpha(al*0.55))
+	}
+
+	// 风眼：一个亮核 + 绕行的小气旋点。
+	glow(p, x, y, rad*0.30, ui.Hex("#EFFFF8"), al*0.85)
+	circle(p, x, y, max32(.9, rad*0.045), ui.Hex("#F4FFFA").Alpha(al*0.9))
+	for i := 0; i < 8; i++ {
+		a := float64(turn)*math.Pi*2.4 + float64(i)*tau/8
+		rr := rad * (0.35 + 0.30*grow)
+		px := x + rr*float32(math.Cos(a))
+		py := y + rr*float32(math.Sin(a))
+		circle(p, px, py, max32(.5, rad*0.014), teal.Alpha(al*0.40))
+	}
+}
+
 // drawIntroBrand 右下角的 "HANABI" 字标：逐字绘制以做出字距。
+//
+// fade 已经是整层的淡出（Intro.Opacity），这里不能再乘一次 in.Opacity()：
+// 那会让品牌字按不透明度的平方衰减，比其它元素早得多地消失（踩过）。
 func drawIntroBrand(p *ui.Painter, r ui.Rect, in *intro.Intro, fade float32) {
-	reveal := intro.Smooth(in.T, 0.45, 1.25) * (1 - intro.Smooth(in.T, 4.90, 5.70)) * in.Opacity() * fade
+	reveal := intro.Smooth(in.T, 0.45, 1.25) * (1 - intro.Smooth(in.T, 4.90, 5.70)) * fade
 	if reveal <= 0.01 {
 		return
 	}
@@ -434,8 +567,15 @@ func seg(p *ui.Painter, x0, y0, x1, y1, width float32, c ui.Color) {
 		return
 	}
 	deg := float32(math.Atan2(float64(dy), float64(dx)) * 180 / math.Pi)
+	// 短段（l 小于笔宽）不能用 width/2 当圆角：半径超过短边一半时，
+	// 渲染器只剩两端的圆帽，整条线看起来是一串点。半径夹到 l/2，
+	// 短段就退化成圆/胶囊，相邻段仍然接得上。
+	rad := width / 2
+	if half := l / 2; half < rad {
+		rad = half
+	}
 	p.Transform(ui.Rotation(deg), x0, y0, func() {
-		p.Fill(ui.Rect{X: x0, Y: y0 - width/2, W: l, H: width}, c, width/2)
+		p.Fill(ui.Rect{X: x0, Y: y0 - width/2, W: l, H: width}, c, rad)
 	})
 }
 

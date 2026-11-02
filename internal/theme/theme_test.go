@@ -71,3 +71,60 @@ func TestByID(t *testing.T) {
 		t.Error("不存在的 id 不应查得到")
 	}
 }
+
+// TestPresentationData 钉住顶栏与角色专属造型需要的数据，漏填时界面会静默变空。
+func TestPresentationData(t *testing.T) {
+	for _, c := range All() {
+		if c.Constellation == "" {
+			t.Errorf("%s 没有命之座，顶栏中央会空着", c.ID)
+		}
+		if c.Motto == "" {
+			t.Errorf("%s 没有侧栏副标题", c.ID)
+		}
+	}
+	g, ok := ByID("ganyu")
+	if !ok {
+		t.Fatal("找不到甘雨")
+	}
+	if g.Chrome != ChromeCrystal {
+		t.Errorf("甘雨的窗口按钮应走冰晶切角，实际 %d", g.Chrome)
+	}
+	if g.Ornament != OrnamentQingxin {
+		t.Errorf("甘雨的纹样应为清心纹，实际 %d", g.Ornament)
+	}
+	if g.Motto != "循霜而行" {
+		t.Errorf("甘雨的副标题应为「循霜而行」，实际 %q", g.Motto)
+	}
+	if g.Constellation != "S I N U S   U N I C O R N I S" {
+		t.Errorf("甘雨的命之座不对：%q", g.Constellation)
+	}
+}
+
+// TestThemeEffects 钉住每个角色的窗口按钮与纹样，避免加角色时忘配。
+func TestThemeEffects(t *testing.T) {
+	want := map[string]struct {
+		chrome   Chrome
+		ornament Ornament
+	}{
+		"ganyu":   {ChromeCrystal, OrnamentQingxin},
+		"yoimiya": {ChromePyro, OrnamentGoldfish},
+		"yae":     {ChromeElectro, OrnamentSakura},
+		"nahida":  {ChromeDendro, OrnamentSprig},
+		"furina":  {ChromeHydro, OrnamentTopHat},
+		"faruzan": {ChromeAnemo, OrnamentPolyhedron},
+		"zhongli": {ChromeGeo, OrnamentStoneSeal},
+	}
+	for id, w := range want {
+		c, ok := ByID(id)
+		if !ok {
+			t.Errorf("找不到角色 %s", id)
+			continue
+		}
+		if c.Chrome != w.chrome {
+			t.Errorf("%s 的 Chrome 应为 %d，实际 %d", id, w.chrome, c.Chrome)
+		}
+		if c.Ornament != w.ornament {
+			t.Errorf("%s 的 Ornament 应为 %d，实际 %d", id, w.ornament, c.Ornament)
+		}
+	}
+}

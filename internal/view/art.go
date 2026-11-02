@@ -32,35 +32,40 @@ func poly(p *ui.Painter, w float32, c ui.Color, pts ...float32) {
 	}
 }
 
-// arcLine 用折线近似圆弧（弧度制）。
+// arcLine 用折线近似圆弧（弧度制），再用 Path 描边：连续曲线不会像
+// 逐段胶囊那样在放大后露出接缝。
 func arcLine(p *ui.Painter, cx, cy, rad float32, from, to float64, w float32, c ui.Color) {
-	const steps = 22
-	var px, py float32
+	const steps = 64
+	var path ui.Path
 	for i := 0; i <= steps; i++ {
 		a := from + (to-from)*float64(i)/steps
 		x := cx + rad*float32(math.Cos(a))
 		y := cy + rad*float32(math.Sin(a))
-		if i > 0 {
-			seg(p, px, py, x, y, w, c)
+		if i == 0 {
+			path.MoveTo(x, y)
+		} else {
+			path.LineTo(x, y)
 		}
-		px, py = x, y
 	}
+	p.StrokePath(&path, w, c)
 }
 
-// quadLine 用折线近似二次贝塞尔曲线。
+// quadLine 用折线近似二次贝塞尔曲线，用 Path 一次描边。
 func quadLine(p *ui.Painter, x0, y0, cx, cy, x1, y1, w float32, c ui.Color) {
-	const steps = 16
-	var px, py float32
+	const steps = 64
+	var path ui.Path
 	for i := 0; i <= steps; i++ {
 		t := float32(i) / steps
 		mt := 1 - t
 		x := mt*mt*x0 + 2*mt*t*cx + t*t*x1
 		y := mt*mt*y0 + 2*mt*t*cy + t*t*y1
-		if i > 0 {
-			seg(p, px, py, x, y, w, c)
+		if i == 0 {
+			path.MoveTo(x, y)
+		} else {
+			path.LineTo(x, y)
 		}
-		px, py = x, y
 	}
+	p.StrokePath(&path, w, c)
 }
 
 // quadAt 求二次贝塞尔上 t 处的点与切线角。
@@ -101,6 +106,9 @@ func cardArt(p *ui.Painter, art theme.Art, r ui.Rect, accent ui.Color) {
 	const w = float32(1.15)
 
 	switch art {
+	case theme.ArtNone:
+		// 由 Ornament 的专属纹样接管（清心纹 / 风纹 / 中国结）。
+		return
 	case theme.ArtSakura:
 		artSakura(p, r, w, ink, faint, hot)
 	case theme.ArtFirework:

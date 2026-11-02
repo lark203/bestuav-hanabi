@@ -64,7 +64,7 @@ var (
 	mu    sync.Mutex
 	cache = map[string]*ui.Bitmap{}
 	// thumbs 单独一张缓存：缩略图体积小（每张几百 KB），可以长期留着，
-	// 主题库要同时显示六个角色，不能为此解码六张 4K 原图。
+	// 主题库要同时显示七个角色，不能为此解码七张 4K 原图。
 	thumbs = map[string]*ui.Bitmap{}
 )
 
@@ -121,7 +121,7 @@ func Thumb(rel string, maxW int) *ui.Bitmap {
 
 // Keep 只保留仍需要的位图，其余的释放像素并移出缓存。
 //
-// 一张 4K 壁纸解码后约 33 MB（3840×2160×4）。六个角色的壁纸全留在缓存里
+// 一张 4K 壁纸解码后约 33 MB（3840×2160×4）。七个角色的壁纸全留在缓存里
 // 就是 200 MB 起——切换主题时必须清掉不用的。保留原始文件数据的话
 // （DecodeBitmap 的语义），切回来会重新解码，代价可接受。
 func Keep(keys ...string) {
