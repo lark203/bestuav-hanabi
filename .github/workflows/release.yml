@@ -1,60 +1,117 @@
-name: Release
+name: release
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
-  draft-release:
+  prepare:
+    name: Prepare draft release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Check mygo.json version matches the tag
+        with:
+          fetch-depth: 0
+      - name: Verify tag matches mygo.json version
+        shell: bash
         run: |
-          version="$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' mygo.json | head -n1)"
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "mygo.json version is ${version}, but the tag is ${GITHUB_REF_NAME}" >&2
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="$(python3 -c 'import json;print(json.load(open("mygo.json"))["version"])')"
+          echo "tag=${tag} mygo.json version=${version}"
+          if [ "${tag}" != "v${version}" ]; then
+            echo "::error::tag ${tag} does not match mygo.json version ${version} (expected v${version})."
             exit 1
           fi
-      - name: Create the draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Create draft release if absent
+        shell: bash
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-              --draft --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "release ${tag} already exists; reusing it (--clobber replaces assets)."
+          else
+            gh release create "${tag}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --title "${tag}" \
+              --generate-notes \
+              --latest=false
           fi
 
   build:
-    needs: draft-release
-    name: ${{ matrix.name }}
+    name: Build ${{ matrix.platform }}
+    needs: prepare
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: "0"
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
-          - name: Windows
-            os: ubuntu-latest
-            platform: "windows/amd64"
-          - name: Linux
-            os: ubuntu-latest
-            platform: "linux/amd64"
-          - name: macOS
-            os: macos-latest
-            platform: "darwin/arm64,darwin/amd64"
+          - os: windows-latest
+            platform: windows/amd64
+          - os: macos-latest
+            platform: darwin/universal
+          - os: ubuntu-latest
+            platform: linux/amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install NSIS, for the Windows installer
-        if: matrix.name == 'Windows'
-        run: sudo apt-get update && sudo apt-get install -y nsis
+          cache: true
+      - name: Check update signing key
+        shell: bash
+        env:
+          KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          if [ -z "${KEY}" ]; then
+            echo "::error::missing MYGO_UPDATER_PRIVATE_KEY secret; without it mygo does not write update-*.json and clients cannot update."
+            exit 1
+          fi
       - name: Build and upload
         env:
-          GH_TOKEN: ${{ github.token }}
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
-        run: go tool mygo build -platform "${{ matrix.platform }}" -upload
+        run: go tool mygo build -platform ${{ matrix.platform }} -upload
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.os }}
+          path: build/
+          if-no-files-found: ignore
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $fence = '```'
+          $lines = @("### ${{ matrix.platform }}", "")
+          $files = @(Get-ChildItem -Path build -Recurse -File -ErrorAction SilentlyContinue)
+          if ($files.Count -gt 0) {
+            $lines += $fence
+            foreach ($f in $files) {
+              $rel = $f.FullName.Substring((Get-Location).Path.Length + 1)
+              $lines += ("{0}  {1:N0} KB" -f $rel, ($f.Length / 1KB))
+            }
+            $lines += $fence
+          } else {
+            $lines += "(no artifacts)"
+          }
+          $lines += ""
+          $lines += "After all three platforms: gh release edit $env:GITHUB_REF_NAME --draft=false --latest"
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

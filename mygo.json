@@ -10,6 +10,7 @@
   "resources": ["assets"],
   "updates": {
     "publicKey": "n4yhUrKZdyX4iorEdCf4Z6o6Oqu9wx3YoHV9s7RqhlQ=",
-    "github": "lark203/bestuav-hanabi"
+    "github": "lark203/bestuav-hanabi",
+    "tagPrefix": "v"
   }
 }
