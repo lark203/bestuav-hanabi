@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: gofmt
+        run: |
+          out="$(gofmt -l ./internal ./scripts ./main.go | grep -v 'testdata/template' || true)"
+          if [ -n "$out" ]; then echo "需要 gofmt:"; echo "$out"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: template snapshot
+        run: python3 scripts/snapshot-template.py --check
+      - name: tests
+        run: go test ./...
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: build
+        run: go build ./...

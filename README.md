@@ -3,6 +3,46 @@
 以角色主题为核心的桌面 UI，用 Go + [mygo](https://github.com/egoist/mygo) 实现。
 视觉与交互参考开源项目 [HanaBi-ui-Genshin](https://github.com/xiaoyeuzixi/HanaBi-ui-Genshin)（C++/ImGui 原生实现）。本项目是它的 Go 重写版本：**代码全部重写，只借鉴设计与交互**；壁纸素材由本地从原项目导入，不随仓库分发。
 
+## 作为新项目基座（bestuav-hanabi）
+
+这个仓库同时是一个「角色主题桌面应用」的工程模板：页面注册表、SQLite 页面状态、
+设置导入导出、单实例/安全模式/诊断入口，以及可裁剪的角色素材。
+
+生成一个新项目（在仓库根目录）：
+
+```bash
+go run ./scripts/newproject \
+  -dir ../my-hanabi-app \
+  -module example.com/acme/my-hanabi-app \
+  -name my-hanabi-app -title "我的花火" -id com.acme.hanabi \
+  -assets demo            # none / demo（默认，只带一个角色）/ full
+  # -pages library,settings   # 可选：裁剪侧栏（settings 必须保留）
+  # -skip-build               # 可选：跳过生成后的 go build 自检
+```
+
+- 默认会改写模块路径、`internal/appmeta` 的产品标识、`mygo.json`（版本归零、
+  不继承本仓库的更新源）与 README，并真的跑一次 `go build ./...`。
+- `-assets none` 生成纯色降级版（没有角色素材也能跑）；`demo` 只复制一个角色目录；
+  `full` 复制全部素材。
+- 生成器自身不进入模板（避免递归），安装包里也能用：`internal/scaffold` 内嵌了
+  `internal/scaffold/testdata/template` 快照，无源码时自动用快照生成。
+
+**改完模板要刷新快照**（CI 会检查）：
+
+```bash
+python scripts/snapshot-template.py
+python scripts/snapshot-template.py --check
+```
+
+日常开发约定：
+
+- 新增页面：写 `func (a *App) xxxPage(c *ui.Context)`，在 `internal/view/registry.go`
+  的 `navRegistry()` 加一行（行尾 `//gen:id=xxx` 是生成器的裁剪标记）。
+- 页面私有状态（筛选、上次视图等）用 `a.prefSet(page, key, value)`，启动时
+  `AttachStore` 会恢复到 `App` 字段；没有数据库时自动退化为内存。
+- 应用偏好仍放 `settings.json`；配置导出/导入在「设置 → 数据与关于」。
+- 启动参数：`--version` / `--page=settings` / `--reset-settings` / `--safe-mode`。
+
 ## 当前阶段：多角色主题 + 开场动画 + 动态壁纸 + 设置、转场与自动更新
 
 已完成：
