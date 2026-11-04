@@ -1,0 +1,19 @@
+# 构建产物
+/build/
+*.exe
+*.app
+*.dmg
+*.deb
+
+
+
+# 编辑器与系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+
+# Python 资源脚本的缓存
+__pycache__/
+*.pyc

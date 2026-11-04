@@ -1,0 +1,113 @@
+package main
+
+// 壁纸：静态插画 + 人物呼吸 + 发丝分层飘动 + 环境漂移。
+//
+// 硬约束：**建筑、天空完全不动**。这靠三层遮罩当闸门实现——
+// 遮罩以外的地方根本不产生位移，而不是靠调参"看起来不动"：
+//
+//	image1 = person   人物区域：呼吸只发生在这里
+//	image2 = hair     R 基础层 / G 细缕层：发丝与衣摆
+//	image3 = ambient  环境：只覆盖大块柔和的区域（天空、光、雾、水）
+//
+// 模型：位移量本身按遮罩衰减（delta = 振幅 × 遮罩），最后**只采样一次**。
+//
+// 参考项目 background.cpp 的写法是采样两次再按遮罩混色
+// （lerp(Original(uv), Original(uv+delta), mask)）。那样遮罩是硬边时没问题，
+// 但遮罩一旦羽化，混合带里会同时看到"原像素"和"位移后的像素"——人物轮廓上
+// 出现一圈重影描边（八重神子的发丝上非常明显，第一批截图就是这么翻车的）。
+//
+// 改成「位移乘权重、单次采样」：mask=0 处 delta 严格为 0，采样点与原图完全
+// 相同（连量化误差都没有），羽化带里则是平滑过渡的形变，不会出现重影。
+//
+// 素材语义（全部按像素实测；遮罩统一 1920×1080，采样按 UV 换算）：
+//   - 甘雨 person      灰度：人物区域，非零 4.9%，硬边（p50=255）
+//   - 甘雨 hair.R      原 flow-mask（960×540）：整片发区，会被自身权重限制在头部/肩
+//   - 甘雨 hair.G      原 wave-a：一缕发丝（x 46.6~59.2% / y 26.5~42.7%）
+//   - 八重神子 person  .hbc 全部图层的 alpha 并集（人物轮廓）
+//   - 八重神子 hair.R  各图层自带 mask.r 按 alpha 加权取并集
+//   - 八重神子 hair.G  其中权重最大的一层（右侧长辫）
+//   - 其余主题的遮罩来源见 scripts/assetgen/generate.py
+
+var Time float // 秒，动效时钟
+var Play float // 0..1，动效强度；0 = 完全静止（截图对比与低功耗场景用）
+
+var Tint vec3        // 目标色调（元素色，0..1）
+var TintAmount float // 0 = 原色，1 = 完全染色
+
+// BreathStrength 是呼吸起伏的幅度，单位是图片 UV 的垂直分量
+// （0.0020 ≈ 4K 图上 4.3px）。0 = 不呼吸。
+var BreathStrength float
+
+// FlowStrength 是发丝飘动的幅度（图片 UV）。0 = 发丝不动。
+var FlowStrength float
+
+// DriftStrength 是环境漂移的幅度（图片 UV）。0 = 环境静止。
+var DriftStrength float
+
+// DriftDir 是环境漂移的方向（单位向量）。
+var DriftDir vec2
+
+// DriftSpeed 是环境漂移的相位速度倍率（水慢、风快）。
+var DriftSpeed float
+
+// wave 是三阶正弦的谐波求和。
+//
+// 纯正弦走起来像机械抖动；叠上高次谐波才有"快慢不一"的自然感。
+// 系数取自参考项目里的傅里叶级数（1, -0.1616, 0.0083）。
+func wave(ph float) float {
+	return sin(ph) - 0.1616*sin(2.0*ph) + 0.0083*sin(3.0*ph)
+}
+
+func Fragment(dst vec4, pos vec2) vec4 {
+	size := rectSize()
+	img := image0Size()
+
+	// Cover：按较大的那个比例缩放后居中裁切，与 Go 侧 p.Image(bg, r, ui.Cover) 一致。
+	s := max(size.x/img.x, size.y/img.y)
+	off := (size - img*s) * 0.5
+	uv := (pos - off) / s / img // 图片空间的 0..1 坐标
+
+	// 位移只在遮罩内产生；Play=0 时 delta 恒为零，等价于直接按 uv 采样。
+	delta := vec2(0.0, 0.0)
+	if Play > 0.0001 && (BreathStrength > 0.000001 || FlowStrength > 0.000001 || DriftStrength > 0.000001) {
+		// 三层遮罩。image1/2/3 尺寸可以各自不同（按 UV 换算到各自像素）。
+		person := image1Sample(uv*image1Size()).r
+		hair := image2Sample(uv*image2Size())
+		ambient := image3Sample(uv*image3Size()).r
+
+		// 呼吸：垂直、全人物同步、约 4.5 秒一个周期。乘 person 是为了让
+		// 闸门羽化带里的位移同比例收敛到 0。
+		delta += vec2(0.0, sin(Time*1.4)*BreathStrength*person)
+
+		if FlowStrength > 0.000001 {
+			// 发丝两层：基础层（整片发区）慢而小，细缕快而略大，方向偏开约 30°。
+			// 两层频率、速度、相位都不同，相邻发缕的位移量因此不同，
+			// 才是一缕一缕分开飘，而不是整片一起平移。
+			w0 := wave(dot(uv, vec2(9.0, 13.0)) + Time*0.78)
+			w1 := wave(dot(uv, vec2(-12.0, 16.0)) + Time*1.12 + 1.9)
+			// 末尾乘 person：发丝层本身可能比人物宽（甘雨的 flow-mask 就横铺到了
+			// 天空上），必须被人物闸门裁一刀，否则天空会跟着摆。
+			delta += (vec2(0.87, -0.50)*w0*hair.r + vec2(0.99, 0.14)*w1*hair.g*1.3) * (FlowStrength * person)
+		}
+
+		if DriftStrength > 0.000001 {
+			// 环境：两列慢速行波叠加，沿 DriftDir 方向推。相位速度与频率都比
+			// 发丝低一档——它要像风、像水，不能像抖动。
+			speed := Time * 0.22 * max(DriftSpeed, 0.05)
+			d0 := sin(dot(uv, vec2(5.0, 7.0)) + speed)
+			d1 := sin(dot(uv, vec2(-8.0, 5.0)) - speed*1.37 + 1.7)
+			delta += DriftDir * (0.6*d0 + 0.4*d1) * (DriftStrength * ambient)
+		}
+	}
+
+	// 只采样一次：遮罩为 0 的像素 delta 为 0，采样点与原图完全相同，不会出现重影。
+	c := image0Sample((uv + delta) * img)
+
+	// 保亮度染色：把原图的明暗重映射到元素色上（类似单色调滤镜）。
+	luma := dot(c.rgb, vec3(0.299, 0.587, 0.114))
+	tintLuma := max(dot(Tint, vec3(0.299, 0.587, 0.114)), 0.06)
+	tinted := Tint * (luma / tintLuma)
+	c = vec4(mix(c.rgb, tinted, TintAmount), c.a)
+
+	return c
+}

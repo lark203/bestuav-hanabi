@@ -1,0 +1,16 @@
+{
+  "name": "花火",
+  "slug": "hanabi",
+  "identifier": "com.bestuav.hanabi",
+  "version": "0.1.2",
+  "publisher": "BestUAV",
+  "copyright": "Copyright © 2026 BestUAV",
+  "out": "build",
+  "icon": "assets/icon.png",
+  "resources": ["assets"],
+  "updates": {
+    "publicKey": "n4yhUrKZdyX4iorEdCf4Z6o6Oqu9wx3YoHV9s7RqhlQ=",
+    "github": "lark203/bestuav-hanabi",
+    "tagPrefix": "v"
+  }
+}
