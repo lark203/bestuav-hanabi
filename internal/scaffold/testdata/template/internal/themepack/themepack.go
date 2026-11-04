@@ -187,6 +187,43 @@ func Install(zipPath, themesDir, assetsDir string, known map[string]bool) (theme
 	return ch, nil
 }
 
+// Inspect 只读 theme.json（校验格式与 id），用于「重新导入」时确认还是同一个角色。
+func Inspect(zipPath string) (Pack, error) {
+	var pack Pack
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return pack, fmt.Errorf("打不开主题包: %w", err)
+	}
+	defer zr.Close()
+	found := false
+	for _, f := range zr.File {
+		if path.Clean(strings.ReplaceAll(f.Name, "\\", "/")) != "theme.json" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return pack, err
+		}
+		err = json.NewDecoder(io.LimitReader(rc, 1<<20)).Decode(&pack)
+		rc.Close()
+		if err != nil {
+			return pack, fmt.Errorf("theme.json 解析失败: %w", err)
+		}
+		found = true
+		break
+	}
+	if !found {
+		return pack, errors.New("主题包缺少 theme.json")
+	}
+	if pack.Format <= 0 || pack.Format > Format {
+		return pack, fmt.Errorf("主题包格式版本 %d 不受支持", pack.Format)
+	}
+	if !idRe.MatchString(pack.ID) {
+		return pack, fmt.Errorf("非法角色 id: %q", pack.ID)
+	}
+	return pack, nil
+}
+
 // Remove 删除一个已安装的主题包（theme.json 与 assets/<id>）。
 func Remove(themesDir, assetsDir, id string) error {
 	if !idRe.MatchString(id) {

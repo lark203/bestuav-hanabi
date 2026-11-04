@@ -100,6 +100,9 @@ func (a *App) dataPanel(c *ui.Context) {
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, ch.NameCN+" · "+ch.ID).
 						FontSize(a.fs(11)).TextColor(a.tok.Text).Grow(1)
+					if ui.Button(c, "重新导入…").Clicked() {
+						a.reimportThemePack(ch.ID)
+					}
 					if ui.Button(c, "删除").Clicked() {
 						a.removeThemePack(ch.ID)
 					}

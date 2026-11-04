@@ -100,6 +100,29 @@ func TestInstallRejects(t *testing.T) {
 	}
 }
 
+func TestInspect(t *testing.T) {
+	zipPath := makeZip(t, samplePack(), map[string]string{"demo/bg.jpg": "x"})
+	pack, err := Inspect(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.ID != "demo" || pack.NameCN != "演示" {
+		t.Errorf("Inspect = %+v", pack)
+	}
+	bad := makeZip(t, samplePack(), map[string]string{"demo/bg.jpg": "x"})
+	_ = bad
+	// 缺 theme.json：换一个只有图片的包。
+	only := filepath.Join(t.TempDir(), "only.zip")
+	f, _ := os.Create(only)
+	zw := zip.NewWriter(f)
+	w, _ := zw.Create("demo/bg.jpg")
+	_, _ = w.Write([]byte("x"))
+	_ = zw.Close()
+	_ = f.Close()
+	if _, err := Inspect(only); err == nil {
+		t.Error("缺 theme.json 应报错")
+	}
+}
 func TestRemove(t *testing.T) {
 	themes, assets := t.TempDir(), t.TempDir()
 	zipPath := makeZip(t, samplePack(), map[string]string{"demo/bg.jpg": "x"})

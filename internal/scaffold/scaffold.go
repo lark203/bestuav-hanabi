@@ -254,6 +254,7 @@ func copyTree(root, dst, assets, demo string) error {
 		// 模板仓库自己的快照脚本与「新建项目」页不进入生成项目
 		// （后者依赖 scaffold，生成项目里没有生成器）。
 		if rel == filepath.Join("scripts", "snapshot-template.py") ||
+			rel == filepath.Join("scripts", "release-check.py") ||
 			rel == filepath.Join("internal", "view", "newproject_page.go") ||
 			rel == filepath.Join("internal", "view", "newproject_page_test.go") {
 			return nil

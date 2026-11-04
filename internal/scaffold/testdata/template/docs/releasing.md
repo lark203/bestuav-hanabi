@@ -14,10 +14,12 @@
 4. 本地检查：
 
 ```powershell
-go vet ./...
-go test ./...
-python scripts/snapshot-template.py --check
+python scripts/release-check.py --tag v0.1.3
 ```
+
+脚本会检查：`mygo.json` 版本、CHANGELOG 是否有对应段、tag 是否等于 `v` + 版本且尚未创建、
+模板快照、`go vet` / `go build` / `go test`。常用开关：`--skip-tests`（快速检查）、
+`--require-clean`（工作区必须干净）。
 
 ## 2. 提交与打 tag
 

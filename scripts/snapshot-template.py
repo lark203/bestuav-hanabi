@@ -35,7 +35,7 @@ SKIP_DIRS = {
     "scripts/newproject",
 }
 # Repo-only files that do not belong in the template snapshot.
-SKIP_FILES = {"scripts/snapshot-template.py", "internal/view/newproject_page.go", "internal/view/newproject_page_test.go"}
+SKIP_FILES = {"scripts/snapshot-template.py", "scripts/release-check.py", "internal/view/newproject_page.go", "internal/view/newproject_page_test.go"}
 
 SNAP_SUFFIX = {"go.mod": ".snapshot", "go.sum": ".snapshot"}
 

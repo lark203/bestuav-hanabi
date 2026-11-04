@@ -89,7 +89,7 @@ demo/*.png                 呼吸/发丝/环境遮罩（可选）
 
 主题包只能**复用内建的绘制法**（元素/纹样/窗饰/开场/卡片线稿都是枚举），不包含代码；
 id 不能与内建角色冲突。枚举取值见 `internal/themepack/themepack.go` 的映射函数。
-设置页「数据与关于」会列出已导入的外部主题，可逐个删除；重新导入同 id 会覆盖。
+设置页「数据与关于」会列出已导入的外部主题，可逐个「重新导入…」或「删除」；重新导入同 id 会覆盖。
 
 **改完模板要刷新快照**（提交前手动 `--check`）：
 
@@ -110,6 +110,7 @@ python scripts/snapshot-template.py --check
   $env:HANABI_GOLDEN_UPDATE="1"   # 有意改动后更新基准
   go test ./internal/view -run TestGoldenDefault
   ```
+- **发布前检查**：`python scripts/release-check.py --tag vX.Y.Z`（版本/CHANGELOG/tag/快照/vet/build/test 一条命令）。`--skip-tests` 快速检查。
 - 发布流程见 [docs/releasing.md](docs/releasing.md)（tag = `v` + `mygo.json` 版本，
   三平台构建后手动发布 draft release）。
 - 新增页面：写 `func (a *App) xxxPage(c *ui.Context)`，在 `internal/view/registry.go`
