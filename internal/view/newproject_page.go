@@ -29,7 +29,11 @@ func (a *App) newProjectPage(c *ui.Context) {
 					ui.TextInput(c, val)
 				})
 			}
+			hint := func(s string) {
+				ui.Text(c, s).FontSize(a.fs(9)).TextColor(a.tok.TextFaint).Wrap()
+			}
 			field("目标目录", &a.newProj.dir)
+			hint("项目生成到哪里。目录必须不存在或为空；源码、go.mod、资源都会写到这里，生成后可直接 go run ./... 启动。")
 			ui.Row(c).Gap(8).Children(func() {
 				if ui.Button(c, "选择目录…").Clicked() {
 					a.chooseProjectDir()
@@ -41,10 +45,15 @@ func (a *App) newProjectPage(c *ui.Context) {
 				}
 			})
 			field("模块路径", &a.newProj.module)
+			hint("Go module 路径（如 example.com/acme/app）。会改写 go.mod 与所有 internal/… 的 import，新项目应换成自己的域名。")
 			field("产品名/slug", &a.newProj.name)
+			hint("英文短名（如 my-app）。用于配置目录名、窗口状态键、可执行文件名与发布产物命名；不要带空格/中文。")
 			field("窗口标题", &a.newProj.title)
+			hint("窗口标题、关于页与诊断包里的展示名，可以中文。")
 			field("短品牌名", &a.newProj.brand)
+			hint("侧栏左上角的短品牌（2~6 个字符最合适），也用于标题栏；留空时默认同产品名。")
 			field("应用标识", &a.newProj.id)
+			hint("反向域名（如 com.acme.app）。单实例锁、更新源、配置目录与诊断包都用它区分应用，发布后不要随意改。")
 
 			ui.Row(c).Gap(12).Children(func() {
 				ui.Column(c).Gap(4).Grow(1).Children(func() {
@@ -56,13 +65,26 @@ func (a *App) newProjectPage(c *ui.Context) {
 					ui.TextInput(c, &a.newProj.demo)
 				})
 			})
+			switch a.newProj.assets {
+			case "none":
+				hint("素材 none：不复制任何角色素材，界面走纯色降级，体积最小；之后可用「导入素材包」按需补图。")
+			case "full":
+				hint("素材 full：复制全部角色素材（约 20MB），适合直接发布完整版。")
+			default:
+				hint("素材 demo：只复制一个角色目录（下面的 demo 角色），体积小又能看到主题与壁纸效果。")
+			}
+			hint("demo 角色目录：assets/ 下要保留的角色目录名（如 ganyu）；只在 demo 模式生效，必须是模板里已有的角色。")
 			field("保留页面（逗号分隔，留空=全部；settings 必留）", &a.newProj.pages)
+			hint("侧栏保留哪些页面，例如 library,wallpaper,settings。settings 必须保留（设置入口）；留空表示全部保留。")
 
 			ui.Row(c).Gap(14).Wrap().Children(func() {
 				ui.Checkbox(c, &a.newProj.noIntro, "不要开场动画")
 				ui.Checkbox(c, &a.newProj.noUpdate, "不要自动更新")
 				ui.Checkbox(c, &a.newProj.skipBuild, "跳过编译自检")
 			})
+			hint("不要开场动画：删除 view 的 intro.go / opening.go 与相关测试，启动直接进主界面；适合不需要 6 秒开场的工具型项目。")
+			hint("不要自动更新：删除 update.go，设置页显示「未启用」；没有更新源与签名密钥时建议勾选。")
+			hint("跳过编译自检：生成后不跑 go build。速度快，但结果可能因环境问题不可编译，发布前请自己构建一次。")
 
 			ui.Row(c).Gap(8).Children(func() {
 				if ui.Button(c, "生成项目").Disabled(a.genBusy).Clicked() {
