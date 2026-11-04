@@ -6,6 +6,7 @@ package visual
 
 import (
 	"math"
+	"sync"
 
 	"github.com/egoist/mygo/ui"
 
@@ -93,9 +94,70 @@ const (
 )
 
 // All / ByID / Default 主题清单。
-func All() []Character                 { return theme.All() }
-func ByID(id string) (Character, bool) { return theme.ByID(id) }
-func Default() Character               { return theme.Default() }
+func All() []Character {
+	base := theme.All()
+	extMu.RLock()
+	defer extMu.RUnlock()
+	if len(external) == 0 {
+		return base
+	}
+	out := make([]Character, 0, len(base)+len(external))
+	out = append(out, base...)
+	out = append(out, external...)
+	return out
+}
+
+func ByID(id string) (Character, bool) {
+	if c, ok := theme.ByID(id); ok {
+		return c, true
+	}
+	extMu.RLock()
+	defer extMu.RUnlock()
+	for _, c := range external {
+		if c.ID == id {
+			return c, true
+		}
+	}
+	return Character{}, false
+}
+
+func Default() Character { return theme.Default() }
+
+var (
+	extMu    sync.RWMutex
+	external []Character
+)
+
+// RegisterExternal 注册运行时导入的主题（重复 id/与内建冲突的跳过）。
+//
+// 在创建 App 之前调用（main 启动时），保证主题库与启动主题都能看到它们。
+func RegisterExternal(chs []Character) {
+	extMu.Lock()
+	defer extMu.Unlock()
+	known := map[string]bool{}
+	for _, c := range theme.All() {
+		known[c.ID] = true
+	}
+	for _, c := range external {
+		known[c.ID] = true
+	}
+	for _, c := range chs {
+		if c.ID == "" || known[c.ID] {
+			continue
+		}
+		known[c.ID] = true
+		external = append(external, c)
+	}
+}
+
+// BuiltinIDs 返回内建主题 id（导入主题包时用于防冲突）。
+func BuiltinIDs() map[string]bool {
+	out := map[string]bool{}
+	for _, c := range theme.All() {
+		out[c.ID] = true
+	}
+	return out
+}
 
 // Background / Icon 角色素材（缺素材时返回 nil，界面退化为纯色）。
 func Background(c Character) *ui.Bitmap { return assets.Bitmap(c.Bg) }

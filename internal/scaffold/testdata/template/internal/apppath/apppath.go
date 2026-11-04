@@ -50,3 +50,12 @@ func LogDir() (string, error) {
 	}
 	return filepath.Join(d, "logs"), nil
 }
+
+// ThemesDir 返回外部主题包目录（运行时加载）。
+func ThemesDir() (string, error) {
+	d, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, "themes"), nil
+}

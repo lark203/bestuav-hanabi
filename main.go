@@ -22,7 +22,9 @@ import (
 	"bestuav-hanabi/internal/cli"
 	"bestuav-hanabi/internal/settings"
 	"bestuav-hanabi/internal/store"
+	"bestuav-hanabi/internal/themepack"
 	"bestuav-hanabi/internal/view"
+	"bestuav-hanabi/internal/visual"
 )
 
 func main() {
@@ -96,6 +98,14 @@ func main() {
 		// 用户导入的素材写在这里（安装目录可能只读，macOS .app 尤其如此）。
 		if d, err := apppath.Dir(); err == nil {
 			assets.SetUserDir(filepath.Join(d, "assets"))
+			// 外部主题包：先注册再创建 App，主题库与启动主题都能看到。
+			if themesDir, err := apppath.ThemesDir(); err == nil {
+				chs, errs := themepack.LoadDir(themesDir)
+				for _, e := range errs {
+					fmt.Fprintln(os.Stderr, "外部主题加载失败:", e)
+				}
+				visual.RegisterExternal(chs)
+			}
 		}
 		app = view.NewAppWithSettings(settings.Load())
 		app.AttachStore(db)

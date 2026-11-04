@@ -51,6 +51,41 @@ ganyu/*.png            动态遮罩（可选，按 theme.go 的 Motion 路径）
 清空解码缓存、下一帧生效。未知角色 id、路径穿越、非图片与 >300MB 的包会被拒绝。
 配合生成器的 `-assets none`：先生成纯色项目，再按需导入某个角色的素材。
 
+**角色主题包**（新增角色，不只是补图）：设置 →「数据与关于」→「导入主题包…」，
+选一个 zip；导入后立即出现在主题库，下次启动从用户目录 `themes/*.json` 自动加载。
+
+```
+theme.json                 {"format":1,"id":"demo", ...}
+demo/bg.jpg                壁纸（必需）
+demo/icon.png              头像（可选）
+demo/*.png                 呼吸/发丝/环境遮罩（可选）
+```
+
+`theme.json` 关键字段（颜色 `#RRGGBB`/`#RRGGBBAA`）：
+
+```json
+{
+  "format": 1, "id": "demo",
+  "nameCN": "演示", "nameEN": "Demo", "epithet": "试作",
+  "motto": "测试一下", "constellation": "D E M O",
+  "scene": "测试 · 场景", "sceneEN": "A TEST",
+  "element": "cryo", "motif": "crystal", "opening": "ganyu",
+  "chrome": "plain", "ornament": "none", "art": "blossom",
+  "cardBg": "#203040", "bg": "demo/bg.jpg", "icon": "demo/icon.png",
+  "tokens": {"winFill":"#101820", "winStroke":"#203040", "sidebar":"#0c1218",
+             "card":"#182430", "cardStroke":"#304050", "text":"#e8f0f8",
+             "textMuted":"#a0b0c0", "textFaint":"#708090",
+             "accent":"#80c0ff", "accentSoft":"#20304080",
+             "good":"#80ff80", "danger":"#ff6080", "radius": 12},
+  "motion": {"person":"demo/person.png", "breath":0.002,
+             "hair":"demo/hair.png", "sway":0.001},
+  "wallTint": 0.15, "scrim": 0.18
+}
+```
+
+主题包只能**复用内建的绘制法**（元素/纹样/窗饰/开场/卡片线稿都是枚举），不包含代码；
+id 不能与内建角色冲突。枚举取值见 `internal/themepack/themepack.go` 的映射函数。
+
 **改完模板要刷新快照**（CI 会检查）：
 
 ```bash

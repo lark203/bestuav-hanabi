@@ -82,6 +82,9 @@ func (a *App) dataPanel(c *ui.Context) {
 			if ui.Button(c, "导入素材包…").Clicked() {
 				a.importAssetPack()
 			}
+			if ui.Button(c, "导入主题包…").Clicked() {
+				a.importThemePack()
+			}
 		})
 		if a.notice != "" {
 			ui.Text(c, a.notice).FontSize(a.fs(10)).TextColor(a.tok.Accent)
