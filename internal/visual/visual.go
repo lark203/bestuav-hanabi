@@ -138,15 +138,42 @@ func RegisterExternal(chs []Character) {
 	for _, c := range theme.All() {
 		known[c.ID] = true
 	}
-	for _, c := range external {
-		known[c.ID] = true
-	}
 	for _, c := range chs {
 		if c.ID == "" || known[c.ID] {
 			continue
 		}
-		known[c.ID] = true
-		external = append(external, c)
+		replaced := false
+		for i := range external {
+			if external[i].ID == c.ID {
+				external[i] = c // 重新导入同 id：覆盖
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			external = append(external, c)
+		}
+	}
+}
+
+// ExternalThemes 返回已注册的外部主题（导入/删除管理用）。
+func ExternalThemes() []Character {
+	extMu.RLock()
+	defer extMu.RUnlock()
+	out := make([]Character, len(external))
+	copy(out, external)
+	return out
+}
+
+// RemoveExternal 从运行时注册表移除外部主题。
+func RemoveExternal(id string) {
+	extMu.Lock()
+	defer extMu.Unlock()
+	for i, c := range external {
+		if c.ID == id {
+			external = append(external[:i], external[i+1:]...)
+			return
+		}
 	}
 }
 

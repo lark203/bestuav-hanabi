@@ -120,6 +120,7 @@ func Generate(o Options) (Result, error) {
 	if !keepSet["settings"] {
 		return res, errors.New("必须保留 settings 页面（否则没有设置入口）")
 	}
+	delete(keepSet, "newproject") // 只属于模板仓库：生成项目没有 scaffold 包
 
 	if err := copyTree(o.Root, o.Dir, o.Assets, o.DemoAsset); err != nil {
 		return res, err
@@ -142,9 +143,6 @@ func Generate(o Options) (Result, error) {
 	if err := rewriteReadme(filepath.Join(o.Dir, "README.md"), o); err != nil {
 		return res, err
 	}
-	if err := writeGeneratedCI(o.Dir); err != nil {
-		return res, err
-	}
 	if o.NoIntro {
 		if err := stripIntro(o.Dir); err != nil {
 			return res, err
@@ -157,7 +155,12 @@ func Generate(o Options) (Result, error) {
 	}
 
 	res.Dir = o.Dir
-	res.Pages = keep
+	res.Pages = nil
+	for _, p := range allPages {
+		if keepSet[p] {
+			res.Pages = append(res.Pages, p)
+		}
+	}
 	res.Assets = o.Assets
 	if n, err := countFiles(o.Dir); err == nil {
 		res.Files = n
@@ -248,9 +251,11 @@ func copyTree(root, dst, assets, demo string) error {
 			}
 			return os.MkdirAll(filepath.Join(dst, rel), 0o755)
 		}
-		// 仓库自己的 CI / 快照脚本依赖模板仓库结构；生成项目换成通用 CI。
-		if rel == filepath.Join(".github", "workflows", "ci.yml") ||
-			rel == filepath.Join("scripts", "snapshot-template.py") {
+		// 模板仓库自己的快照脚本与「新建项目」页不进入生成项目
+		// （后者依赖 scaffold，生成项目里没有生成器）。
+		if rel == filepath.Join("scripts", "snapshot-template.py") ||
+			rel == filepath.Join("internal", "view", "newproject_page.go") ||
+			rel == filepath.Join("internal", "view", "newproject_page_test.go") {
 			return nil
 		}
 		if err := copyFile(path, filepath.Join(dst, rel)); err != nil {
@@ -453,47 +458,6 @@ func rewriteReadme(path string, o Options) error {
 		body = body[:i+1] + note + body[i+1:]
 	}
 	return os.WriteFile(path, []byte(body), 0o644)
-}
-
-// generatedCI 是生成项目用的通用 CI（不含模板快照检查）。
-const generatedCI = `name: ci
-
-on:
-  push:
-    branches: ["**"]
-  pull_request:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: go vet ./...
-      - run: go test ./...
-
-  build-windows:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: go build ./...
-`
-
-func writeGeneratedCI(dir string) error {
-	path := filepath.Join(dir, ".github", "workflows", "ci.yml")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(generatedCI), 0o644)
 }
 
 // stripIntro 去掉开场动画：删掉 view 里的绘制与测试，注入空的 introLayer，

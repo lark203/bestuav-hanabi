@@ -34,8 +34,8 @@ SKIP_DIRS = {
     "internal/scaffold",
     "scripts/newproject",
 }
-# The repository CI checks the snapshot; generated projects get a plain CI instead.
-SKIP_FILES = {".github/workflows/ci.yml", "scripts/snapshot-template.py"}
+# Repo-only files that do not belong in the template snapshot.
+SKIP_FILES = {"scripts/snapshot-template.py", "internal/view/newproject_page.go", "internal/view/newproject_page_test.go"}
 
 SNAP_SUFFIX = {"go.mod": ".snapshot", "go.sum": ".snapshot"}
 

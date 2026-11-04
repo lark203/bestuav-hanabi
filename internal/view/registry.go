@@ -30,6 +30,7 @@ func navRegistry() []navItem {
 	return []navItem{
 		{id: libraryPageID, label: "主题库", icon: icons.Palette, build: (*App).libraryPage},      //gen:id=library
 		{id: wallpaperPageID, label: "壁纸", icon: icons.Picture, build: (*App).placeholderPage}, //gen:id=wallpaper
+		{id: newprojectPageID, label: "新建项目", icon: icons.Plus, build: (*App).newProjectPage},  //gen:id=newproject
 		{id: settingsPageID, label: "设置", icon: icons.Sliders, build: (*App).settingsPage},     //gen:id=settings
 	}
 }

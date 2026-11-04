@@ -6,6 +6,7 @@ import (
 
 	"bestuav-hanabi/internal/appmeta"
 	"bestuav-hanabi/internal/settings"
+	"bestuav-hanabi/internal/visual"
 )
 
 // settingsPage 是应用级设置：版本与更新、数据与存储、关于。
@@ -88,6 +89,22 @@ func (a *App) dataPanel(c *ui.Context) {
 		})
 		if a.notice != "" {
 			ui.Text(c, a.notice).FontSize(a.fs(10)).TextColor(a.tok.Accent)
+		}
+		if themes := visual.ExternalThemes(); len(themes) > 0 {
+			ui.Spacer(c)
+			ui.Text(c, "外部主题包").FontSize(a.fs(13)).TextColor(a.tok.Text)
+			ui.Text(c, "重新导入同 id 会覆盖；删除会移除主题与它的素材。").
+				FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
+			for _, ch := range themes {
+				ch := ch
+				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, ch.NameCN+" · "+ch.ID).
+						FontSize(a.fs(11)).TextColor(a.tok.Text).Grow(1)
+					if ui.Button(c, "删除").Clicked() {
+						a.removeThemePack(ch.ID)
+					}
+				})
+			}
 		}
 		ui.Text(c, "恢复默认会重置字号、壁纸显现、动效与启动方式，保留当前主题。").
 			FontSize(a.fs(10)).TextColor(a.tok.TextFaint.Alpha(.8))

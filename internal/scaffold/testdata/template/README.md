@@ -28,6 +28,10 @@ go run ./scripts/newproject \
 - 生成器自身不进入模板（避免递归），安装包里也能用：`internal/scaffold` 内嵌了
   `internal/scaffold/testdata/template` 快照，无源码时自动用快照生成。
 
+**图形界面**：侧栏「新建项目」用表单完成同样的生成（目录选择、模块/名称/标题/标识、
+素材模式、页面裁剪、去开场/去更新、跳过编译自检），结果和状态直接显示在页面上；
+不用记命令行参数。生成目录必须不存在或为空。
+
 **新增页面**（不需要手改分发逻辑）：
 
 ```bash
@@ -85,8 +89,9 @@ demo/*.png                 呼吸/发丝/环境遮罩（可选）
 
 主题包只能**复用内建的绘制法**（元素/纹样/窗饰/开场/卡片线稿都是枚举），不包含代码；
 id 不能与内建角色冲突。枚举取值见 `internal/themepack/themepack.go` 的映射函数。
+设置页「数据与关于」会列出已导入的外部主题，可逐个删除；重新导入同 id 会覆盖。
 
-**改完模板要刷新快照**（CI 会检查）：
+**改完模板要刷新快照**（提交前手动 `--check`）：
 
 ```bash
 python scripts/snapshot-template.py
@@ -96,10 +101,10 @@ python scripts/snapshot-template.py --check
 日常开发约定：
 
 - **测试**：`go test ./...`；页面/主题的离屏渲染矩阵在 `internal/view/render_matrix_test.go`
-  （7 主题 × 3 页面，纯色降级，CI 可跑）。
+  （7 主题 × 3 页面，纯色降级，离屏可跑）。
 - **基准**：`go test ./internal/view -bench . -benchmem`（离屏软件光栅，数值看相对变化；
   1280×800 单帧约 1ms 量级）。
-- **像素基准**（本地可选，字体栅格化因平台而异，CI 不跑）：
+- **像素基准**（本地可选，字体栅格化因平台而异）：
   ```powershell
   $env:HANABI_GOLDEN="1"          # 比较 internal/view/testdata/golden/default.png
   $env:HANABI_GOLDEN_UPDATE="1"   # 有意改动后更新基准
@@ -392,7 +397,7 @@ git tag v0.1.1
 git push github v0.1.1
 ```
 
-只有推 GitHub 的 tag 会触发 CI；推 AtomGit 不会。在 Actions 里等三个平台跑完，
+只有推 GitHub 的 tag 会触发发布工作流；推 AtomGit 不会。在 Actions 里等三个平台跑完，
 检查 draft release 并发布。发布后旧版本就能自动更新。
 
 ### 本机推送与代理

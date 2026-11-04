@@ -75,6 +75,10 @@ type App struct {
 	safeMode bool
 	// notice 设置页的一次性提示（导入/导出结果）。
 	notice string
+	// newProj 是「新建项目」页的表单；genBusy/genStatus 是生成中的状态。
+	newProj   newProjectForm
+	genBusy   bool
+	genStatus string
 }
 
 // animFPS 是壁纸动效的重绘频率：这类缓慢漂移在这个帧率下已经连续。
@@ -130,6 +134,7 @@ func newApp(s settings.Settings, persist bool) *App {
 		pageAt:    time.Now().Add(-time.Hour), // 启动页不做入场动画
 		introDone: !s.IntroPlay,
 		upd:       updateState{events: make(chan updateEvent, 4)},
+		newProj:   defaultNewProjectForm(),
 	}
 	a.settings.Theme = c.ID
 	if _, ok := visual.ByID(a.settings.Theme); !ok {

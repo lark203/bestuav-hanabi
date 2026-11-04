@@ -100,6 +100,25 @@ func TestInstallRejects(t *testing.T) {
 	}
 }
 
+func TestRemove(t *testing.T) {
+	themes, assets := t.TempDir(), t.TempDir()
+	zipPath := makeZip(t, samplePack(), map[string]string{"demo/bg.jpg": "x"})
+	if _, err := Install(zipPath, themes, assets, map[string]bool{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Remove(themes, assets, "demo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(themes, "demo.json")); !os.IsNotExist(err) {
+		t.Error("theme.json 应被删除")
+	}
+	if _, err := os.Stat(filepath.Join(assets, "demo")); !os.IsNotExist(err) {
+		t.Error("素材目录应被删除")
+	}
+	if err := Remove(themes, assets, "../evil"); err == nil {
+		t.Error("非法 id 应拒绝")
+	}
+}
 func TestLoadDirSkipsBad(t *testing.T) {
 	dir := t.TempDir()
 	bad := samplePack()

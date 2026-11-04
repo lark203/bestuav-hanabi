@@ -187,6 +187,20 @@ func Install(zipPath, themesDir, assetsDir string, known map[string]bool) (theme
 	return ch, nil
 }
 
+// Remove 删除一个已安装的主题包（theme.json 与 assets/<id>）。
+func Remove(themesDir, assetsDir, id string) error {
+	if !idRe.MatchString(id) {
+		return fmt.Errorf("非法角色 id: %q", id)
+	}
+	if err := os.Remove(filepath.Join(themesDir, id+".json")); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.RemoveAll(filepath.Join(assetsDir, id)); err != nil {
+		return err
+	}
+	return nil
+}
+
 // LoadDir 读取目录里的 *.json 主题包；坏文件跳过并返回错误列表（启动时只记日志）。
 func LoadDir(dir string) ([]theme.Character, []error) {
 	entries, err := os.ReadDir(dir)
