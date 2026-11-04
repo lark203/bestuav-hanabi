@@ -19,8 +19,8 @@ const newprojectPageID = "newproject"
 // 只有模板仓库里有这页（生成器会把本文件与导航条目裁掉），生成的 App 不需要
 // scaffold 包。
 func (a *App) newProjectPage(c *ui.Context) {
-	ui.Scroll(c).Grow(1).Children(func() {
-		ui.Column(c).Padding(4, 6, 10, 0).Gap(10).Children(func() {
+	pageScroll(c, 0, func() {
+		ui.Column(c).Gap(10).Children(func() {
 			ui.Text(c, "新建项目").FontSize(a.fs(22)).Bold().TextColor(a.tok.Text)
 			ui.Text(c, "从当前模板生成一个可编译的独立项目；等价于 go run ./scripts/newproject。").
 				FontSize(a.fs(11)).TextColor(a.tok.TextFaint)

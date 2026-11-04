@@ -116,6 +116,9 @@ python scripts/snapshot-template.py --check
 - **发布前检查**：`python scripts/release-check.py --tag vX.Y.Z`（版本/CHANGELOG/tag/快照/vet/build/test 一条命令）。`--skip-tests` 快速检查。
 - 发布流程见 [docs/releasing.md](docs/releasing.md)（tag = `v` + `mygo.json` 版本，
   三平台构建后手动发布 draft release）。
+- **可滚动页面**统一用 `pageScroll(c, gap, func(){ … })`，它会铺满剩余高度并在右侧
+  给覆盖式滚动条留空；不要直接写 `ui.Scroll`（`page_layout_test.go` 会检查），
+  否则输入框/卡片会和滚动条贴在一起。
 - 新增页面：写 `func (a *App) xxxPage(c *ui.Context)`，在 `internal/view/registry.go`
   的 `navRegistry()` 加一行（行尾 `//gen:id=xxx` 是生成器的裁剪标记）；也可以用
   `go run ./scripts/newpage` 自动生成。
