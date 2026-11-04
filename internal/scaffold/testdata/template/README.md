@@ -60,6 +60,18 @@ python scripts/snapshot-template.py --check
 
 日常开发约定：
 
+- **测试**：`go test ./...`；页面/主题的离屏渲染矩阵在 `internal/view/render_matrix_test.go`
+  （7 主题 × 3 页面，纯色降级，CI 可跑）。
+- **基准**：`go test ./internal/view -bench . -benchmem`（离屏软件光栅，数值看相对变化；
+  1280×800 单帧约 1ms 量级）。
+- **像素基准**（本地可选，字体栅格化因平台而异，CI 不跑）：
+  ```powershell
+  $env:HANABI_GOLDEN="1"          # 比较 internal/view/testdata/golden/default.png
+  $env:HANABI_GOLDEN_UPDATE="1"   # 有意改动后更新基准
+  go test ./internal/view -run TestGoldenDefault
+  ```
+- 发布流程见 [docs/releasing.md](docs/releasing.md)（tag = `v` + `mygo.json` 版本，
+  三平台构建后手动发布 draft release）。
 - 新增页面：写 `func (a *App) xxxPage(c *ui.Context)`，在 `internal/view/registry.go`
   的 `navRegistry()` 加一行（行尾 `//gen:id=xxx` 是生成器的裁剪标记）；也可以用
   `go run ./scripts/newpage` 自动生成。

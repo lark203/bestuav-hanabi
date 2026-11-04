@@ -25,6 +25,7 @@ type (
 	Chrome    = theme.Chrome
 	Opening   = theme.Opening
 	Art       = theme.Art
+	Motion    = theme.Motion
 	Flow      = wallpaper.Flow
 	Options   = wallpaper.Options
 	Intro     = intro.Intro
