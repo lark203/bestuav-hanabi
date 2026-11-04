@@ -27,6 +27,15 @@ go run ./scripts/newproject \
 - 生成器自身不进入模板（避免递归），安装包里也能用：`internal/scaffold` 内嵌了
   `internal/scaffold/testdata/template` 快照，无源码时自动用快照生成。
 
+**新增页面**（不需要手改分发逻辑）：
+
+```bash
+go run ./scripts/newpage -id notes -label "笔记" -icon Square
+```
+
+会生成 `internal/view/page_notes.go` 并在 `registry.go` 插入一条导航（`//gen:id=notes`）；
+`-icon` 取 `internal/ui/icons` 里的名字，`-skip-build` 可跳过编译自检。失败会自动回滚。
+
 **改完模板要刷新快照**（CI 会检查）：
 
 ```bash
