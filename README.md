@@ -17,6 +17,7 @@ go run ./scripts/newproject \
   -name my-hanabi-app -title "我的花火" -id com.acme.hanabi \
   -assets demo            # none / demo（默认，只带一个角色）/ full
   # -pages library,settings   # 可选：裁剪侧栏（settings 必须保留）
+  # -no-intro -no-update      # 可选：去掉开场动画 / 自动更新（删对应 view 代码并注入空实现）
   # -skip-build               # 可选：跳过生成后的 go build 自检
 ```
 

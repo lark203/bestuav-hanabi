@@ -32,6 +32,8 @@ func main() {
 		demo       = flag.String("demo", "ganyu", "demo 模式保留的角色目录")
 		pages      = flag.String("pages", "", "保留的页面 id，逗号分隔（默认全部；settings 必须保留）")
 		skipBuild  = flag.Bool("skip-build", false, "跳过生成后的 go build 自检")
+		noIntro    = flag.Bool("no-intro", false, "去掉开场动画（删 view 的 intro/opening 与相关测试）")
+		noUpdate   = flag.Bool("no-update", false, "去掉自动更新（删 update.go，注入空实现）")
 	)
 	flag.Parse()
 	if *dir == "" || *module == "" || *name == "" || *title == "" || *identifier == "" {
@@ -62,6 +64,8 @@ func main() {
 		DemoAsset:  *demo,
 		KeepPages:  keep,
 		SkipBuild:  *skipBuild,
+		NoIntro:    *noIntro,
+		NoUpdate:   *noUpdate,
 	})
 	if err != nil {
 		fail(err)

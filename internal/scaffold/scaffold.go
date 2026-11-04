@@ -44,6 +44,8 @@ type Options struct {
 	DemoAsset  string   // demo 模式保留的角色目录（默认 ganyu）
 	KeepPages  []string // 保留的页面 id；空 = 全部
 	SkipBuild  bool     // 跳过编译自检（测试/调试用）
+	NoIntro    bool     // 去掉开场动画（删 view 的 intro/opening 与相关测试，注入空实现）
+	NoUpdate   bool     // 去掉自动更新（删 update.go，注入空实现）
 }
 
 // Result 生成结果。
@@ -142,6 +144,16 @@ func Generate(o Options) (Result, error) {
 	}
 	if err := writeGeneratedCI(o.Dir); err != nil {
 		return res, err
+	}
+	if o.NoIntro {
+		if err := stripIntro(o.Dir); err != nil {
+			return res, err
+		}
+	}
+	if o.NoUpdate {
+		if err := stripUpdate(o.Dir); err != nil {
+			return res, err
+		}
 	}
 
 	res.Dir = o.Dir
@@ -482,6 +494,72 @@ func writeGeneratedCI(dir string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(generatedCI), 0o644)
+}
+
+// stripIntro 去掉开场动画：删掉 view 里的绘制与测试，注入空的 introLayer，
+// 并让 App 启动即 introDone（不再画覆盖层）。internal/intro 保留，视觉层接口不变。
+func stripIntro(dir string) error {
+	view := filepath.Join(dir, "internal", "view")
+	for _, name := range []string{
+		"intro.go", "opening.go",
+		"handoff_test.go", "intro_view_test.go", "introrender_test.go", "theme_render_test.go",
+	} {
+		if err := os.Remove(filepath.Join(view, name)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	appPath := filepath.Join(view, "app.go")
+	data, err := os.ReadFile(appPath)
+	if err != nil {
+		return err
+	}
+	text := strings.Replace(string(data),
+		"introDone: !s.IntroPlay,",
+		"introDone: true, // 生成器 -no-intro：没有开场动画", 1)
+	if err := os.WriteFile(appPath, []byte(text), 0o644); err != nil {
+		return err
+	}
+	stub := `package view
+
+import "github.com/egoist/mygo/ui"
+
+// introLayer 是生成器去掉开场后的空实现（-no-intro）。
+func (a *App) introLayer(p *ui.Painter, r ui.Rect) {}
+`
+	return os.WriteFile(filepath.Join(view, "intro_stub.go"), []byte(stub), 0o644)
+}
+
+// stripUpdate 去掉自动更新：删 update.go 与测试，注入空状态与按钮占位。
+func stripUpdate(dir string) error {
+	view := filepath.Join(dir, "internal", "view")
+	for _, name := range []string{"update.go", "update_test.go"} {
+		if err := os.Remove(filepath.Join(view, name)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	stub := `package view
+
+import "github.com/egoist/mygo/ui"
+
+// 生成器 -no-update：保留 App.upd 字段与设置页调用点，但什么都不做。
+type updateEvent struct{}
+
+type updateState struct {
+	events chan updateEvent
+}
+
+func (a *App) pollUpdate(c *ui.Context) {}
+
+func (a *App) updateEnabled() bool { return false }
+
+func (a *App) updateStatusLine() string { return "当前构建未启用自动更新" }
+
+func (a *App) updateControls(c *ui.Context) {
+	ui.Text(c, "当前构建未启用自动更新（生成器 -no-update）").
+		FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
+}
+`
+	return os.WriteFile(filepath.Join(view, "update_stub.go"), []byte(stub), 0o644)
 }
 
 func build(dir string) (string, error) {

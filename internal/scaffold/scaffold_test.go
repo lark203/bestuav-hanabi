@@ -125,6 +125,40 @@ func TestGenerateFromEmbeddedSnapshot(t *testing.T) {
 	}
 }
 
+// TestStripIntroAndUpdate 去掉开场与自动更新后仍能编译。
+func TestStripIntroAndUpdate(t *testing.T) {
+	dst := filepath.Join(t.TempDir(), "lean")
+	_, err := Generate(Options{
+		Root:       repoRoot(t),
+		Dir:        dst,
+		Module:     "example.com/acme/lean",
+		Name:       "lean",
+		Title:      "精简版",
+		Identifier: "com.acme.lean",
+		Assets:     "none",
+		NoIntro:    true,
+		NoUpdate:   true,
+	})
+	if err != nil {
+		t.Fatalf("生成失败: %v", err)
+	}
+	view := filepath.Join(dst, "internal", "view")
+	for _, gone := range []string{"intro.go", "opening.go", "update.go", "update_test.go"} {
+		if _, err := os.Stat(filepath.Join(view, gone)); !os.IsNotExist(err) {
+			t.Errorf("%s 应被删除", gone)
+		}
+	}
+	for _, stub := range []string{"intro_stub.go", "update_stub.go"} {
+		if _, err := os.Stat(filepath.Join(view, stub)); err != nil {
+			t.Errorf("%s 缺失: %v", stub, err)
+		}
+	}
+	app, _ := os.ReadFile(filepath.Join(view, "app.go"))
+	if !strings.Contains(string(app), "introDone: true") {
+		t.Error("无开场时应启动即 introDone")
+	}
+}
+
 func TestGenerateRejectsNonEmptyTarget(t *testing.T) {
 	dst := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dst, "x"), []byte("x"), 0o644); err != nil {
