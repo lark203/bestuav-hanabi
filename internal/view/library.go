@@ -107,6 +107,7 @@ func (a *App) switchThemeView(c *ui.Context, view int) {
 	}
 	a.themeView = view
 	a.viewAt = a.clock()
+	a.prefSet(libraryPageID, "view", view)
 	c.Invalidate()
 }
 
@@ -156,10 +157,16 @@ func (a *App) elementFilter(c *ui.Context) {
 	row.Children(func() {
 		ui.Text(c, "元素").FontSize(a.fs(10)).TextColor(a.tok.TextFaint).Padding(0, 10)
 
-		a.filterChip(c, "全部", a.filter < 0, func() { a.filter = -1 })
+		a.filterChip(c, "全部", a.filter < 0, func() {
+			a.filter = -1
+			a.prefSet(libraryPageID, "filter", -1)
+		})
 		for _, el := range order {
 			el := el
-			a.filterChip(c, el.Short(), a.filter == int(el), func() { a.filter = int(el) })
+			a.filterChip(c, el.Short(), a.filter == int(el), func() {
+				a.filter = int(el)
+				a.prefSet(libraryPageID, "filter", int(el))
+			})
 		}
 
 		ui.Spacer(c)
@@ -284,10 +291,8 @@ func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
 // placeholderPage 尚未实现的页面。
 func (a *App) placeholderPage(c *ui.Context) {
 	title := "未命名"
-	for _, it := range nav {
-		if it.id == a.page {
-			title = it.label
-		}
+	if it, ok := pageByID(a.page); ok {
+		title = it.label
 	}
 	ui.Text(c, title).FontSize(a.fs(22)).Bold().TextColor(a.tok.Text)
 	ui.Text(c, "该页面尚未实现（骨架阶段）。").FontSize(a.fs(12)).TextColor(a.tok.TextFaint)

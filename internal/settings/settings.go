@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/egoist/mygo"
 )
@@ -171,6 +172,26 @@ func SaveTo(path string, s Settings) error {
 		return os.WriteFile(path, data, 0o644)
 	}
 	return nil
+}
+
+// Reset 把偏好恢复默认，旧文件改名成 settings.json.bak-<时间>（能找回）。
+// 返回备份路径；文件本来不存在时返回空。
+func Reset() (string, error) {
+	p, err := DefaultPath()
+	if err != nil {
+		return "", err
+	}
+	backup := ""
+	if _, statErr := os.Stat(p); statErr == nil {
+		backup = p + ".bak-" + time.Now().Format("20060102-150405")
+		if err := os.Rename(p, backup); err != nil {
+			return "", err
+		}
+	}
+	if err := Save(Default()); err != nil {
+		return backup, err
+	}
+	return backup, nil
 }
 
 // DefaultPath 返回 settings.json 的默认路径。

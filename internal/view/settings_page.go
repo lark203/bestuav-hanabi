@@ -4,6 +4,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/appmeta"
 	"bestuav-hanabi/internal/settings"
 )
 
@@ -33,7 +34,7 @@ func (a *App) settingsPage(c *ui.Context) {
 // versionPanel 左侧：版本与更新。
 func (a *App) versionPanel(c *ui.Context) {
 	a.panel(c, "版本与更新", "当前构建与自动更新状态", func() {
-		ui.Text(c, "花火 HanaBi").FontSize(a.fs(19)).Bold().TextColor(a.tok.Text)
+		ui.Text(c, appmeta.Title).FontSize(a.fs(19)).Bold().TextColor(a.tok.Text)
 		ui.Text(c, "版本 "+appVersion()).FontSize(a.fs(11)).TextColor(a.tok.TextMuted)
 		ui.Text(c, "以角色主题为核心的桌面 UI。").
 			FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
@@ -62,14 +63,26 @@ func (a *App) dataPanel(c *ui.Context) {
 		ui.Text(c, path).FontSize(a.fs(10)).TextColor(a.tok.TextFaint).
 			SingleLine().Ellipsis("…").Tooltip(path)
 
-		ui.Row(c).Gap(8).Children(func() {
+		ui.Row(c).Gap(8).Wrap().Children(func() {
 			if ui.Button(c, "复制路径").Clicked() {
 				c.WriteClipboard(path)
 			}
 			if ui.Button(c, "恢复默认设置").Clicked() {
 				a.resetSettings(c)
 			}
+			if ui.Button(c, "导出配置…").Clicked() {
+				a.exportProfile()
+			}
+			if ui.Button(c, "导入配置…").Clicked() {
+				a.importProfile()
+			}
+			if ui.Button(c, "导出诊断包").Clicked() {
+				a.exportDiagnostics()
+			}
 		})
+		if a.notice != "" {
+			ui.Text(c, a.notice).FontSize(a.fs(10)).TextColor(a.tok.Accent)
+		}
 		ui.Text(c, "恢复默认会重置字号、壁纸显现、动效与启动方式，保留当前主题。").
 			FontSize(a.fs(10)).TextColor(a.tok.TextFaint.Alpha(.8))
 

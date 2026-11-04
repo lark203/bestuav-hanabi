@@ -84,6 +84,9 @@ func (a *App) pollUpdate(c *ui.Context) {
 
 // updateEnabled 只探测一次：Enabled 会试写安装目录，不适合每帧调用。
 func (a *App) updateEnabled() bool {
+	if a.safeMode {
+		return false
+	}
 	if !a.upd.enabledKnown {
 		a.upd.enabled = mygo.Updater.Enabled()
 		a.upd.enabledKnown = true

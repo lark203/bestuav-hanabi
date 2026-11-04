@@ -4,28 +4,23 @@ package view
 import (
 	"math"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/appmeta"
 	"bestuav-hanabi/internal/assets"
 	"bestuav-hanabi/internal/intro"
 	"bestuav-hanabi/internal/settings"
+	"bestuav-hanabi/internal/store"
 	"bestuav-hanabi/internal/theme"
 	"bestuav-hanabi/internal/ui/icons"
 	"bestuav-hanabi/internal/wallpaper"
 )
 
-// nav 侧栏条目：id、标题、图标。
-var nav = []struct {
-	id, label string
-	icon      *ui.SVG
-}{
-	{"library", "主题库", icons.Palette},
-	{"wallpaper", "壁纸", icons.Picture},
-	{"settings", "设置", icons.Sliders},
-}
+// nav 已迁到 registry.go（侧栏与页面分发共用一份数据）。
 
 // App 是应用状态与视图根。
 type App struct {
@@ -76,6 +71,13 @@ type App struct {
 
 	// 自动更新的检查/安装状态；网络与文件操作在 update.go 里放到 goroutine。
 	upd updateState
+
+	// st 页面私有状态（page_pref）；nil 时退化为内存（测试/无库启动）。
+	st *store.Store
+	// safeMode 跳过自动更新检查。
+	safeMode bool
+	// notice 设置页的一次性提示（导入/导出结果）。
+	notice string
 }
 
 // animFPS 是壁纸动效的重绘频率：这类缓慢漂移在这个帧率下已经连续。
@@ -120,7 +122,7 @@ func newApp(s settings.Settings, persist bool) *App {
 	a := &App{
 		char:      c,
 		tok:       c.Tok,
-		page:      "library",
+		page:      firstPageID(),
 		settings:  s,
 		persist:   persist,
 		t0:        time.Now(),
@@ -585,7 +587,7 @@ func (a *App) sidebar(c *ui.Context) {
 				ui.Row(c).Width(40).Height(40)
 			}
 			ui.Column(c).Gap(1).Children(func() {
-				ui.Text(c, "HanaBi").FontSize(a.fs(19)).Bold().TextColor(a.tok.Text)
+				ui.Text(c, appmeta.Brand).FontSize(a.fs(19)).Bold().TextColor(a.tok.Text)
 				ui.Text(c, a.char.Motto).FontSize(a.fs(9)).TextColor(a.tok.TextFaint)
 			})
 		})
@@ -595,7 +597,7 @@ func (a *App) sidebar(c *ui.Context) {
 			Padding(13, 10, 6, 20)
 
 		ui.Column(c).PaddingX(12).Gap(2).Children(func() {
-			for _, it := range nav {
+			for _, it := range navRegistry() {
 				a.navRow(c, it.id, it.label, it.icon)
 			}
 		})
@@ -846,14 +848,11 @@ func (a *App) content(c *ui.Context) {
 				page = page.Opacity(k).Transform(ui.Translation(0, (1-k)*10))
 			}
 			page.Children(func() {
-				switch a.page {
-				case "library":
-					a.libraryPage(c)
-				case "settings":
-					a.settingsPage(c)
-				default:
-					a.placeholderPage(c)
+				if it, ok := pageByID(a.page); ok && it.build != nil {
+					it.build(a, c)
+					return
 				}
+				a.placeholderPage(c)
 			})
 		})
 }
@@ -868,7 +867,7 @@ func (a *App) statusbar(c *ui.Context) {
 	ui.Row(c).Height(34).Padding(0, 16).AlignItems(ui.Center).
 		Children(func() {
 			ui.Spacer(c)
-			ui.Text(c, "HANABI / PERSONAL WORKSPACE").FontSize(a.fs(8.5)).
+			ui.Text(c, strings.ToUpper(appmeta.Brand)+" / PERSONAL WORKSPACE").FontSize(a.fs(8.5)).
 				TextColor(a.tok.TextFaint.Alpha(0.72))
 			ui.Spacer(c)
 			ui.Text(c, "本地工作空间").FontSize(a.fs(9.5)).

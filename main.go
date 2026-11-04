@@ -1,48 +1,121 @@
-// 花火 HanaBi：以角色主题为核心的桌面 UI（学习自 HanaBi-ui-Genshin 的视觉与交互）。
+// 花火 HanaBi：以角色主题为核心的桌面 UI。
 //
-// 窗口隐藏系统标题栏与窗口控件，由界面自绘（见 internal/view/app.go 的 titlebar）：
-// 否则自带的标题栏会和界面里的那条叠成两条。
+// 窗口隐藏系统标题栏与窗口控件，由界面自绘（见 internal/view/app.go 的 titlebar）。
+//
+// 这里只做启动编排：参数 → 单实例锁 → 重置偏好（可选）→ 数据库 → App → 窗口。
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
+	"runtime"
 	"runtime/debug"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/appmeta"
+	"bestuav-hanabi/internal/apppath"
+	"bestuav-hanabi/internal/cli"
 	"bestuav-hanabi/internal/settings"
+	"bestuav-hanabi/internal/store"
 	"bestuav-hanabi/internal/view"
 )
 
 func main() {
-	// 壁纸解码/缩放是几十 MB 的短命分配：默认 GOGC=100 会先把堆翻倍再回收，
-	// 切几次主题进程就涨到几百 MB。50 让 GC 早一点介入；再加一个软上限兜底，
-	// 防止异常增长时把内存吃满（超过上限只会更勤快地 GC，不会直接失败）。
+	// 壁纸解码/缩放是几十 MB 的短命分配：默认 GOGC=100 会先翻倍再回收。
 	debug.SetGCPercent(50)
 	debug.SetMemoryLimit(384 << 20)
 
+	opts, err := cli.Parse(os.Args[1:], os.Stderr)
+	if err != nil {
+		if err == flag.ErrHelp {
+			return
+		}
+		fmt.Fprintln(os.Stderr, "参数错误:", err)
+		os.Exit(2)
+	}
+	if opts.Version {
+		cli.AttachConsole()
+		fmt.Printf("%s %s (%s/%s)\n", appmeta.Title, appmeta.BuildVersion(), runtime.GOOS, runtime.GOARCH)
+		return
+	}
+
+	var (
+		app *view.App
+		win *mygo.Window
+	)
+
+	// 单实例：重复启动只唤出已有窗口（并可带 --page 跳页）。
+	if !mygo.App.RequestSingleInstanceLock() {
+		cli.AttachConsole()
+		fmt.Fprintln(os.Stderr, "已有一个实例在运行。")
+		return
+	}
+	mygo.App.OnSecondInstance(func(args []string, _ string) {
+		page := cli.PageFromArgs(args)
+		mygo.RunOnMain(func() {
+			if app == nil {
+				return
+			}
+			if page != "" {
+				app.SetPage(page)
+			}
+			if win != nil {
+				win.Show()
+				win.Focus()
+			}
+		})
+	})
+
+	if opts.ResetSettings {
+		if backup, err := settings.Reset(); err != nil {
+			cli.AttachConsole()
+			fmt.Fprintln(os.Stderr, "重置偏好失败:", err)
+		} else if backup != "" {
+			cli.AttachConsole()
+			fmt.Fprintln(os.Stderr, "已重置偏好，旧文件备份在:", backup)
+		}
+	}
+
+	// 数据库：失败不影响启动（页面状态退化为内存）。
+	var db *store.Store
+	if !opts.SafeMode {
+		if path, err := apppath.DBPath(); err == nil {
+			if s, err := store.Open(path); err == nil {
+				db = s
+				defer func() { _ = db.Close() }()
+			}
+		}
+	}
+
 	mygo.App.WhenReady(func() {
-		// 先读用户设置：启动主题、字号、动效开关都在这里恢复。
-		a := view.NewAppWithSettings(settings.Load())
-		// 退出前把还没落盘的拖动/开关写掉（平时是 300ms 防抖保存）。
-		mygo.App.OnQuit(a.FlushSettings)
-		win := mygo.NewWindow(mygo.WindowOptions{
-			Title:     "花火 HanaBi",
+		app = view.NewAppWithSettings(settings.Load())
+		app.AttachStore(db)
+		if opts.SafeMode {
+			app.SetSafeMode(true)
+		}
+		if opts.Page != "" {
+			app.SetPage(opts.Page)
+		}
+		mygo.App.OnQuit(app.FlushSettings)
+
+		win = mygo.NewWindow(mygo.WindowOptions{
+			Title:     appmeta.Title,
 			Width:     1280,
 			Height:    800,
 			MinWidth:  1000,
 			MinHeight: 640,
-			StateKey:  "bestuav-hanabi",
+			StateKey:  appmeta.Name,
 
-			// 隐藏标题栏但保留窗口阴影、圆角与可缩放边缘
-			// （Frameless 在 Windows 上会连阴影一起丢掉）。
-			TitleBarStyle: mygo.TitleBarHidden,
-			// 连系统按钮也隐藏：按钮由界面自绘，并调用 Minimize/Maximize/Close。
+			// 隐藏标题栏但保留阴影/圆角/缩放边（Frameless 在 Windows 上会连阴影一起丢）。
+			TitleBarStyle:     mygo.TitleBarHidden,
 			HideWindowButtons: true,
 
-			Content: ui.View(a.View),
+			Content: ui.View(app.View),
 		})
-		a.SetWindow(win)
+		app.SetWindow(win)
 	})
 
 	if err := mygo.App.Run(); err != nil {
