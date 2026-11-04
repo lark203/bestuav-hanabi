@@ -74,7 +74,30 @@ func findAssetsDir() string {
 var (
 	mu    sync.Mutex
 	cache = map[string]*ui.Bitmap{}
+	// userDir 是用户导入的素材目录（优先于安装目录里的 assets/）。
+	userDir string
 )
+
+// Dir 返回只读资源根目录（安装包/源码树里的 assets/）。
+func Dir() string { return assetsDir }
+
+// SetUserDir 设置可写的用户素材目录；为空时只用 Dir()。
+func SetUserDir(dir string) { userDir = dir }
+
+// UserDir 返回导入素材应写入的目录（用户目录优先，否则资源目录）。
+func UserDir() string {
+	if userDir != "" {
+		return userDir
+	}
+	return assetsDir
+}
+
+// Clear 清空解码缓存；导入/替换素材后调用，下次读取会重新解码。
+func Clear() {
+	mu.Lock()
+	cache = map[string]*ui.Bitmap{}
+	mu.Unlock()
+}
 
 // Bitmap 返回 assets/<rel> 解码后的位图，失败返回 nil（并记住失败，不重试）。
 func Bitmap(rel string) *ui.Bitmap {
@@ -84,7 +107,10 @@ func Bitmap(rel string) *ui.Bitmap {
 	if bmp, ok := cache[rel]; ok {
 		return bmp
 	}
-	data, err := os.ReadFile(filepath.Join(assetsDir, rel))
+	data, err := os.ReadFile(filepath.Join(userDirOr(assetsDir), rel))
+	if err != nil && userDir != "" {
+		data, err = os.ReadFile(filepath.Join(assetsDir, rel))
+	}
 	if err != nil {
 		cache[rel] = nil
 		return nil
@@ -99,6 +125,14 @@ func Bitmap(rel string) *ui.Bitmap {
 	bmp := ui.NewBitmap(img)
 	cache[rel] = bmp
 	return bmp
+}
+
+// userDirOr 返回用户素材目录（未设置时回退到资源目录）。
+func userDirOr(fallback string) string {
+	if userDir != "" {
+		return userDir
+	}
+	return fallback
 }
 
 // Keep 只保留仍需要的位图，其余移出缓存。

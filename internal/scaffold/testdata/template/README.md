@@ -37,6 +37,20 @@ go run ./scripts/newpage -id notes -label "笔记" -icon Square
 会生成 `internal/view/page_notes.go` 并在 `registry.go` 插入一条导航（`//gen:id=notes`）；
 `-icon` 取 `internal/ui/icons` 里的名字，`-skip-build` 可跳过编译自检。失败会自动回滚。
 
+**角色素材包**（只补素材，不新增角色）：设置 →「数据与关于」→「导入素材包…」，
+选一个 zip：
+
+```
+manifest.json          {"format":1,"id":"ganyu","name":"甘雨"}
+ganyu/bg.jpg           角色壁纸
+ganyu/icon.png         头像（可选）
+ganyu/*.png            动态遮罩（可选，按 theme.go 的 Motion 路径）
+```
+
+素材写到**用户目录**的 `assets/`（优先于安装目录，macOS .app 只读也能用），导入后
+清空解码缓存、下一帧生效。未知角色 id、路径穿越、非图片与 >300MB 的包会被拒绝。
+配合生成器的 `-assets none`：先生成纯色项目，再按需导入某个角色的素材。
+
 **改完模板要刷新快照**（CI 会检查）：
 
 ```bash

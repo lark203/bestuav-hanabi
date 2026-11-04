@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 
@@ -17,6 +18,7 @@ import (
 
 	"bestuav-hanabi/internal/appmeta"
 	"bestuav-hanabi/internal/apppath"
+	"bestuav-hanabi/internal/assets"
 	"bestuav-hanabi/internal/cli"
 	"bestuav-hanabi/internal/settings"
 	"bestuav-hanabi/internal/store"
@@ -91,6 +93,10 @@ func main() {
 	}
 
 	mygo.App.WhenReady(func() {
+		// 用户导入的素材写在这里（安装目录可能只读，macOS .app 尤其如此）。
+		if d, err := apppath.Dir(); err == nil {
+			assets.SetUserDir(filepath.Join(d, "assets"))
+		}
 		app = view.NewAppWithSettings(settings.Load())
 		app.AttachStore(db)
 		if opts.SafeMode {

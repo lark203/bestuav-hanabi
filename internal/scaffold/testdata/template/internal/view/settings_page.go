@@ -79,6 +79,9 @@ func (a *App) dataPanel(c *ui.Context) {
 			if ui.Button(c, "导出诊断包").Clicked() {
 				a.exportDiagnostics()
 			}
+			if ui.Button(c, "导入素材包…").Clicked() {
+				a.importAssetPack()
+			}
 		})
 		if a.notice != "" {
 			ui.Text(c, a.notice).FontSize(a.fs(10)).TextColor(a.tok.Accent)
