@@ -5,7 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // glyph 画元素标识的静态版本：品牌图标、侧栏底部、主题卡片的左上角都用它。
@@ -13,7 +13,7 @@ import (
 // 开场动画里的标识（draw*Mark）带生长与旋转，这里不需要时间参数——
 // 同一个 motif 在界面上多处出现，几何必须一致，所以共用一套画法。
 // spin 只影响晶体的侧枝朝向（0 与 1 相差 60°，用于让卡片图标不完全一样）。
-func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alpha, spin float32) {
+func glyph(p *ui.Painter, m visual.Motif, x, y, rad float32, accent ui.Color, alpha, spin float32) {
 	if alpha <= 0.004 || rad <= 0.5 {
 		return
 	}
@@ -21,7 +21,7 @@ func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alp
 	w := max32(1.4, rad*0.09)
 
 	switch m {
-	case theme.MotifFlame:
+	case visual.MotifFlame:
 		// 八条火舌 + 火星。
 		for i := 0; i < 8; i++ {
 			ang := float64(i) * tau / 8
@@ -32,7 +32,7 @@ func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alp
 		}
 		circle(p, x, y, rad*0.26, accent.Alpha(alpha*0.9))
 
-	case theme.MotifBolt:
+	case visual.MotifBolt:
 		// 四道折线闪电。
 		for i := 0; i < 4; i++ {
 			ang := float64(i)*math.Pi/2 + math.Pi/4 + float64(spin)*math.Pi/8
@@ -52,7 +52,7 @@ func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alp
 		}
 		circle(p, x, y, rad*0.22, accent.Alpha(alpha*0.9))
 
-	case theme.MotifGeo:
+	case visual.MotifGeo:
 		// 正六边形 + 内嵌菱形。
 		hexR := rad * 0.92
 		for i := 0; i < 6; i++ {
@@ -72,7 +72,7 @@ func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alp
 		}
 		circle(p, x, y, rad*0.12, line)
 
-	case theme.MotifLeaf:
+	case visual.MotifLeaf:
 		// 草：三片尖叶自中心呈扇形展开 + 向下的短茎。
 		// 叶形就是「两端尖的梭形」——petal 的两条对称二次曲线。
 		for _, ang := range []float64{-math.Pi / 2, -math.Pi/2 - 0.85, -math.Pi/2 + 0.85} {
@@ -82,7 +82,7 @@ func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alp
 		seg(p, x, y, x, y+rad*0.42, w*0.8, line)
 		circle(p, x, y+rad*0.50, w*0.9, line)
 
-	case theme.MotifWave:
+	case visual.MotifWave:
 		// 水：一滴水珠（上尖下圆）+ 底下一道波浪。
 		topY := y - rad*0.55
 		cy := y - rad*0.10
@@ -100,7 +100,7 @@ func glyph(p *ui.Painter, m theme.Motif, x, y, rad float32, accent ui.Color, alp
 		quadLine(p, x-rad*0.62, wy, x-rad*0.31, wy-rad*0.14, x, wy, w*0.8, line)
 		quadLine(p, x, wy, x+rad*0.31, wy+rad*0.14, x+rad*0.62, wy, w*0.8, line)
 
-	case theme.MotifWind:
+	case visual.MotifWind:
 		// 风：两道回旋气流盘向中心，带一条甩出去的尾迹。
 		arcLine(p, x, y, rad*0.88, math.Pi*0.62, math.Pi*1.62, w, line)
 		arcLine(p, x-rad*0.06, y+rad*0.04, rad*0.52, math.Pi*1.72, math.Pi*2.86, w*0.9, line)

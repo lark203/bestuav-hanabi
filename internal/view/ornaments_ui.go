@@ -5,30 +5,30 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 角色纹样在界面上的三处落点：内容区右下角的大淡纹、侧栏底部、导航选中项。
 // 卡片在 library.go 的 cardOrnament 里单独排（它要用卡片坐标）。
 
 // ornamentSignature 画一个纹样的主形；颜色由调用方给。
-func ornamentSignature(p *ui.Painter, o theme.Ornament, cx, cy, r float32,
+func ornamentSignature(p *ui.Painter, o visual.Ornament, cx, cy, r float32,
 	col ui.Color, t float32) {
 	switch o {
-	case theme.OrnamentQingxin:
+	case visual.OrnamentQingxin:
 		qingxin(p, cx, cy, r, col, .1)
-	case theme.OrnamentGoldfish:
+	case visual.OrnamentGoldfish:
 		goldfish(p, cx, cy, r, col, t)
 		firework(p, cx+r*.72, cy-r*.80, r*.28, fade(col, .55), .2)
-	case theme.OrnamentSakura:
+	case visual.OrnamentSakura:
 		sakura(p, cx, cy, r, col, .15)
-	case theme.OrnamentSprig:
+	case visual.OrnamentSprig:
 		sprig(p, cx, cy, r, col, t)
-	case theme.OrnamentTopHat:
+	case visual.OrnamentTopHat:
 		topHat(p, cx, cy, r, col, t)
-	case theme.OrnamentPolyhedron:
+	case visual.OrnamentPolyhedron:
 		archiveBook(p, cx, cy, r*.92, col, t)
-	case theme.OrnamentStoneSeal:
+	case visual.OrnamentStoneSeal:
 		stoneSeal(p, cx, cy, r, col)
 	}
 }
@@ -41,18 +41,18 @@ func (a *App) drawChromeOrnament(p *ui.Painter, r ui.Rect) {
 	right := r.X + r.W
 	bottom := r.Y + r.H
 	switch a.char.Ornament {
-	case theme.OrnamentQingxin:
+	case visual.OrnamentQingxin:
 		qingxin(p, right-45, bottom-40, 61, ui.RGBA(176, 217, 235, .11), .1)
-	case theme.OrnamentGoldfish:
+	case visual.OrnamentGoldfish:
 		goldfish(p, right-83, bottom-48, 47, ui.RGBA(255, 204, 140, .14), t)
 		firework(p, right-202, bottom-14, 25, ui.RGBA(255, 218, 162, .11), .2)
-	case theme.OrnamentSakura:
+	case visual.OrnamentSakura:
 		sakura(p, right-51, bottom-44, 57, fade(accent, .15), .15)
 		for j := 0; j < 3; j++ {
 			y := bottom - 4 + float32(j)*14
 			waveLine(p, r.X+r.W*.62, y, r.W*.38, 18+float32(j)*4, 0, fade(gold, .08), .7)
 		}
-	case theme.OrnamentSprig:
+	case visual.OrnamentSprig:
 		sprig(p, right-65, bottom-41, 47, ui.RGBA(215, 232, 159, .17), t)
 		for side := float32(-1); side <= 1; side += 2 {
 			curveLine(p,
@@ -62,7 +62,7 @@ func (a *App) drawChromeOrnament(p *ui.Painter, r ui.Rect) {
 				right-65+side*30, bottom-64,
 				fade(ui.RGBA(197, 222, 164, .10), 1), .7)
 		}
-	case theme.OrnamentTopHat:
+	case visual.OrnamentTopHat:
 		topHat(p, right-72, bottom-46, 40, ui.RGBA(195, 222, 241, .16), t)
 		for j := 0; j < 3; j++ {
 			curveLine(p,
@@ -72,7 +72,7 @@ func (a *App) drawChromeOrnament(p *ui.Painter, r ui.Rect) {
 				right-25, bottom-22-float32(j)*8,
 				ui.RGBA(164, 213, 243, .09), .7)
 		}
-	case theme.OrnamentPolyhedron:
+	case visual.OrnamentPolyhedron:
 		archiveBook(p, right-80, bottom-40, 40, ui.RGBA(227, 211, 163, .17), t)
 		for j := 0; j < 3; j++ {
 			x := right - 240 + float32(j)*21
@@ -80,7 +80,7 @@ func (a *App) drawChromeOrnament(p *ui.Painter, r ui.Rect) {
 			p.StrokePath(polyPath(x, y, x+30, y-16), .7, ui.RGBA(173, 225, 203, .11))
 			p.StrokePath(polyPath(x+30, y-16, x+60, y), .7, ui.RGBA(173, 225, 203, .11))
 		}
-	case theme.OrnamentStoneSeal:
+	case visual.OrnamentStoneSeal:
 		stoneSeal(p, right-75, bottom-42, 43, ui.RGBA(230, 184, 104, .19))
 		for j := 0; j < 3; j++ {
 			x := right - 260 + float32(j)*26
@@ -95,19 +95,19 @@ func (a *App) drawChromeOrnament(p *ui.Painter, r ui.Rect) {
 func (a *App) navOrnament(p *ui.Painter, cx, cy, r float32) {
 	accent := a.tok.Accent
 	switch a.char.Ornament {
-	case theme.OrnamentQingxin:
+	case visual.OrnamentQingxin:
 		qingxin(p, cx, cy, r, accent.Alpha(.5), 0)
-	case theme.OrnamentGoldfish:
+	case visual.OrnamentGoldfish:
 		firework(p, cx, cy, r*.9, accent.Alpha(.5), .2)
-	case theme.OrnamentSakura:
+	case visual.OrnamentSakura:
 		sakura(p, cx, cy, r, accent.Alpha(.5), 0)
-	case theme.OrnamentSprig:
+	case visual.OrnamentSprig:
 		sprig(p, cx, cy, r*.8, accent.Alpha(.5), 0)
-	case theme.OrnamentTopHat:
+	case visual.OrnamentTopHat:
 		droplet(p, cx, cy, r*.8, accent.Alpha(.55))
-	case theme.OrnamentPolyhedron:
+	case visual.OrnamentPolyhedron:
 		polyhedron(p, cx, cy, r*.95, accent.Alpha(.65), 0)
-	case theme.OrnamentStoneSeal:
+	case visual.OrnamentStoneSeal:
 		qingxin(p, cx, cy, r, accent.Alpha(.5), 0)
 	default:
 		glyph(p, a.char.Motif, cx, cy, r*.88, accent, .85, 0)
@@ -115,15 +115,15 @@ func (a *App) navOrnament(p *ui.Painter, cx, cy, r float32) {
 }
 
 // cardOrnament 画主题卡片上的角色纹样（参考各角色 _ui.cpp 的 Card）。
-func cardOrnament(p *ui.Painter, r ui.Rect, ch theme.Character, t float32) {
+func cardOrnament(p *ui.Painter, r ui.Rect, ch visual.Character, t float32) {
 	right, bottom := r.X+r.W, r.Y+r.H
 	switch ch.Ornament {
-	case theme.OrnamentQingxin:
+	case visual.OrnamentQingxin:
 		windLines(p, r)
 		qingxin(p, right-81, r.Y+57, 36, ui.RGBA(176, 223, 236, .35), -.3+.025*sinf(float64(t)*.25))
 		chineseKnot(p, right-29, r.Y+12, 1, t)
 
-	case theme.OrnamentGoldfish:
+	case visual.OrnamentGoldfish:
 		firework(p, right-53, r.Y+43, 27, ui.RGBA(255, 214, 144, .35), .15+.02*sinf(float64(t)*.25))
 		goldfish(p, right-61, r.Y+84, 29, ui.RGBA(255, 189, 118, .37), t)
 		for j := 0; j < 2; j++ {
@@ -132,7 +132,7 @@ func cardOrnament(p *ui.Painter, r ui.Rect, ch theme.Character, t float32) {
 				ui.RGBA(255, 198, 130, .18), .8)
 		}
 
-	case theme.OrnamentSakura:
+	case visual.OrnamentSakura:
 		sakura(p, right-83, r.Y+56, 35, ui.RGBA(239, 181, 214, .41), .1+.025*sinf(float64(t)*.25))
 		sakura(p, right-125, r.Y+27, 10, ui.RGBA(227, 193, 149, .47), -.2)
 		for j := 0; j < 3; j++ {
@@ -151,12 +151,12 @@ func cardOrnament(p *ui.Painter, r ui.Rect, ch theme.Character, t float32) {
 		p.StrokePath(polyPath(right-28, r.Y+66, right-22, r.Y+72, right-28, r.Y+78), 1,
 			ui.RGBA(224, 188, 142, .72))
 
-	case theme.OrnamentSprig:
+	case visual.OrnamentSprig:
 		sprig(p, right-35, r.Y+62, 31, ui.RGBA(211, 231, 161, .43), t)
 		curveLine(p, r.X+14, r.Y+89, r.X+r.W*.4, r.Y+58, r.X+r.W*.7, r.Y+103, right-14, r.Y+82,
 			ui.RGBA(219, 230, 163, .20), .8)
 
-	case theme.OrnamentTopHat:
+	case visual.OrnamentTopHat:
 		topHat(p, right-33, r.Y+65, 27, ui.RGBA(192, 221, 243, .45), t)
 		for j := 0; j < 3; j++ {
 			y := r.Y + 86 + float32(j)*6
@@ -164,11 +164,11 @@ func cardOrnament(p *ui.Painter, r ui.Rect, ch theme.Character, t float32) {
 				ui.RGBA(162, 217, 248, float32(32+j*9)/255), .8)
 		}
 
-	case theme.OrnamentPolyhedron:
+	case visual.OrnamentPolyhedron:
 		polyhedron(p, right-29, r.Y+42, 23, ui.RGBA(233, 215, 169, .39), t)
 		archiveBook(p, right-33, r.Y+84, 21, ui.RGBA(179, 222, 201, .25), t)
 
-	case theme.OrnamentStoneSeal:
+	case visual.OrnamentStoneSeal:
 		stoneSeal(p, right-35, r.Y+61, 36, ui.RGBA(249, 205, 121, .41))
 		for j := 0; j < 3; j++ {
 			x := r.X + 20 + float32(j)*28

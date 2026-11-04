@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/intro"
+	"bestuav-hanabi/internal/visual"
 )
 
 // brightPixels 数一个区域里明显亮于背景的像素，用来判断"标识画出来了没有"。
@@ -29,7 +29,7 @@ func brightPixels(img *image.RGBA, cx, cy, half int) int {
 func TestIntroRenders(t *testing.T) {
 	render := func(at float32) *image.RGBA {
 		a := NewApp()
-		a.intro = intro.New(1280, 800)
+		a.intro = visual.New(1280, 800)
 		a.intro.T = at
 		return ui.NewTester(func(c *ui.Context) {
 			// 铺不透明底：离屏画布默认白色，而开场底色带透明度。

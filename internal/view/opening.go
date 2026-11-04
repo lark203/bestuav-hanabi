@@ -5,11 +5,10 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/intro"
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
-// 各角色的开场分镜（参考 characters/*/*_intro.cpp）。
+// 各角色的开场分镜（参考 characters/*/*_visual.cpp）。
 //
 // 原版的核心标识是几千个三角形的材质网格；这里是纯 2D 的近似：
 // 背景建筑/帷幕/书架、围绕标识的专属场景（霜莲珠、烟花金鱼、神樱雷、
@@ -20,19 +19,19 @@ type openingPalette struct {
 	top, bottom, glow ui.Color
 }
 
-func openingPaletteFor(o theme.Opening) openingPalette {
+func openingPaletteFor(o visual.Opening) openingPalette {
 	switch o {
-	case theme.OpeningYoimiya:
+	case visual.OpeningYoimiya:
 		return openingPalette{ui.Hex("#150F19"), ui.Hex("#30201D"), ui.Hex("#F8B365")}
-	case theme.OpeningYae:
+	case visual.OpeningYae:
 		return openingPalette{ui.Hex("#130A20"), ui.Hex("#2A1531"), ui.Hex("#CA87D7")}
-	case theme.OpeningNahida:
+	case visual.OpeningNahida:
 		return openingPalette{ui.Hex("#091A1A"), ui.Hex("#14352A"), ui.Hex("#AFD994")}
-	case theme.OpeningFurina:
+	case visual.OpeningFurina:
 		return openingPalette{ui.Hex("#07111F"), ui.Hex("#10243D"), ui.Hex("#7EC3EC")}
-	case theme.OpeningFaruzan:
+	case visual.OpeningFaruzan:
 		return openingPalette{ui.Hex("#061A1B"), ui.Hex("#103433"), ui.Hex("#7ED9B7")}
-	case theme.OpeningZhongli:
+	case visual.OpeningZhongli:
 		return openingPalette{ui.Hex("#18140F"), ui.Hex("#221A11"), ui.Hex("#E3A33B")}
 	default:
 		return openingPalette{ui.Hex("#071522"), ui.Hex("#102B3A"), ui.Hex("#68BFEA")}
@@ -40,7 +39,7 @@ func openingPaletteFor(o theme.Opening) openingPalette {
 }
 
 // drawIntroLayer 开场的背景与氛围（不含标识、品牌字另画）。
-func (a *App) drawIntroLayer(p *ui.Painter, r ui.Rect, in *intro.Intro, fade, short float32) {
+func (a *App) drawIntroLayer(p *ui.Painter, r ui.Rect, in *visual.Intro, fade, short float32) {
 	pal := openingPaletteFor(a.char.Opening)
 	p.FillGradient(r, ui.LinearGradient{
 		From:  pal.top.Alpha(.995 * fade),
@@ -61,63 +60,63 @@ func (a *App) drawIntroLayer(p *ui.Painter, r ui.Rect, in *intro.Intro, fade, sh
 }
 
 // drawOpeningBackdrop 画每个角色的背景建筑/光景/氛围。
-func (a *App) drawOpeningBackdrop(p *ui.Painter, r ui.Rect, in *intro.Intro, fade, short float32) {
+func (a *App) drawOpeningBackdrop(p *ui.Painter, r ui.Rect, in *visual.Intro, fade, short float32) {
 	t := in.T
 	switch a.char.Opening {
-	case theme.OpeningGanyu:
+	case visual.OpeningGanyu:
 		drawGanyuAtmosphere(p, r, in, fade, short)
-	case theme.OpeningYoimiya:
+	case visual.OpeningYoimiya:
 		drawWarmHorizon(p, r, fade)
 		drawOpeningMotes(p, r, a.char.Opening, t, fade, short)
-	case theme.OpeningYae:
+	case visual.OpeningYae:
 		drawToriiGate(p, r.X+r.W*.10, r.Y+r.H*.18, r.H*.58, r.W*.12, fade*.30)
 		drawToriiGate(p, r.X+r.W*.90, r.Y+r.H*.18, r.H*.58, r.W*.12, fade*.30)
 		drawOpeningMotes(p, r, a.char.Opening, t, fade, short)
-	case theme.OpeningNahida:
+	case visual.OpeningNahida:
 		drawSanctuary(p, r, t, fade)
 		drawOpeningMotes(p, r, a.char.Opening, t, fade, short)
-	case theme.OpeningFurina:
+	case visual.OpeningFurina:
 		drawCurtains(p, r, t, fade)
 		drawOpeningMotes(p, r, a.char.Opening, t, fade, short)
-	case theme.OpeningFaruzan:
+	case visual.OpeningFaruzan:
 		drawArchive(p, r, t, fade)
 		drawOpeningMotes(p, r, a.char.Opening, t, fade, short)
-	case theme.OpeningZhongli:
+	case visual.OpeningZhongli:
 		drawStoneHall(p, r, t, fade)
 		drawOpeningMotes(p, r, a.char.Opening, t, fade, short)
 	}
 }
 
 // drawOpeningScene 画标识周围的专属演出，在标识之前绘制。
-func (a *App) drawOpeningScene(p *ui.Painter, r ui.Rect, pose intro.MarkPose, sceneA float32) {
+func (a *App) drawOpeningScene(p *ui.Painter, r ui.Rect, pose visual.MarkPose, sceneA float32) {
 	if sceneA <= 0.002 {
 		return
 	}
 	t := a.intro.T
 	switch a.char.Opening {
-	case theme.OpeningGanyu:
+	case visual.OpeningGanyu:
 		sceneGanyu(p, pose, t, sceneA)
-	case theme.OpeningYoimiya:
+	case visual.OpeningYoimiya:
 		sceneYoimiya(p, pose, t, sceneA)
-	case theme.OpeningYae:
+	case visual.OpeningYae:
 		sceneYae(p, pose, t, sceneA)
-	case theme.OpeningNahida:
+	case visual.OpeningNahida:
 		sceneNahida(p, pose, t, sceneA)
-	case theme.OpeningFurina:
+	case visual.OpeningFurina:
 		sceneFurina(p, pose, t, sceneA)
-	case theme.OpeningFaruzan:
+	case visual.OpeningFaruzan:
 		sceneFaruzan(p, pose, t, sceneA)
-	case theme.OpeningZhongli:
+	case visual.OpeningZhongli:
 		sceneZhongli(p, pose, t, sceneA)
 	}
 }
 
 // ---------- 通用绘制原语 ----------
 
-func openingSmooth(t, a, b float32) float32 { return intro.Smooth(t, a, b) }
+func openingSmooth(t, a, b float32) float32 { return visual.Smooth(t, a, b) }
 
 func openingWindow(t, a, b, c, d float32) float32 {
-	return intro.Smooth(t, a, b) * (1 - intro.Smooth(t, c, d))
+	return visual.Smooth(t, a, b) * (1 - visual.Smooth(t, c, d))
 }
 
 func openingHash(i int) float32 {
@@ -230,15 +229,15 @@ func openingPearl(p *ui.Painter, cx, cy, r, t, alpha float32, ice bool) {
 
 // ---------- 背景：甘雨 / 宵宫 / 八重 / 纳西妲 / 芙宁娜 / 珐露珊 / 钟离 ----------
 
-func drawGanyuAtmosphere(p *ui.Painter, r ui.Rect, in *intro.Intro, fade, short float32) {
-	for i := 0; i < intro.LantCount; i++ {
+func drawGanyuAtmosphere(p *ui.Painter, r ui.Rect, in *visual.Intro, fade, short float32) {
+	for i := 0; i < visual.LantCount; i++ {
 		x, y, al, size := in.LanternAt(i, short)
 		if al <= .004 || size <= .3 {
 			continue
 		}
 		drawLantern(p, r.X+r.W*x, r.Y+r.H*y, size, al*fade)
 	}
-	for i := 0; i < intro.SnowCount; i++ {
+	for i := 0; i < visual.SnowCount; i++ {
 		x, y, al, ln := in.SnowAt(i, short)
 		if al <= .01 || ln <= 0 {
 			continue
@@ -420,20 +419,20 @@ func drawPillar(p *ui.Painter, x, baseY, h, w, alpha float32) {
 
 // ---------- 氛围粒子 ----------
 
-func drawOpeningMotes(p *ui.Painter, r ui.Rect, o theme.Opening, t, fade, short float32) {
+func drawOpeningMotes(p *ui.Painter, r ui.Rect, o visual.Opening, t, fade, short float32) {
 	var col ui.Color
 	switch o {
-	case theme.OpeningYoimiya:
+	case visual.OpeningYoimiya:
 		col = ui.Hex("#FFB66D")
-	case theme.OpeningYae:
+	case visual.OpeningYae:
 		col = ui.Hex("#D6A2DF")
-	case theme.OpeningNahida:
+	case visual.OpeningNahida:
 		col = ui.Hex("#BCF4A4")
-	case theme.OpeningFurina:
+	case visual.OpeningFurina:
 		col = ui.Hex("#9BE3FF")
-	case theme.OpeningFaruzan:
+	case visual.OpeningFaruzan:
 		col = ui.Hex("#90E4BD")
-	case theme.OpeningZhongli:
+	case visual.OpeningZhongli:
 		col = ui.Hex("#F0AB34")
 	}
 	for j := 0; j < 46; j++ {
@@ -446,16 +445,16 @@ func drawOpeningMotes(p *ui.Painter, r ui.Rect, o theme.Opening, t, fade, short 
 			continue
 		}
 		switch o {
-		case theme.OpeningYae:
+		case visual.OpeningYae:
 			sakura(p, x, y, short*(.012+openingHash(j+740)*.012), col.Alpha(a), t*.2+float32(j))
-		case theme.OpeningNahida:
+		case visual.OpeningNahida:
 			openingFilledPetal(p, x, y, -math.Pi/2+float32(openingHash(j+750)-.5), short*.018, short*.006, col.Alpha(a*.7))
-		case theme.OpeningFaruzan:
+		case visual.OpeningFaruzan:
 			p.StrokePath(polyPath(x-short*.008, y+short*.010, x, y-short*.006, x+short*.008, y+short*.010),
 				.8, col.Alpha(a))
-		case theme.OpeningZhongli:
+		case visual.OpeningZhongli:
 			openingDiamond(p, x, y, short*.006, t*.2, col, a)
-		case theme.OpeningFurina:
+		case visual.OpeningFurina:
 			circle(p, x, y, max32(.7, short*.0015), col.Alpha(a))
 			circle(p, x, y, max32(1.2, short*.004), col.Alpha(a*.18))
 		default:
@@ -466,7 +465,7 @@ func drawOpeningMotes(p *ui.Painter, r ui.Rect, o theme.Opening, t, fade, short 
 
 // ---------- 各角色前景场景 ----------
 
-func sceneGanyu(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneGanyu(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	lift := openingSmooth(t, .85, 3.25)
 	orb := [2]float32{x, y + r*.28*(1-lift)}
@@ -542,7 +541,7 @@ func fireworkBurst(p *ui.Painter, cx, cy, r, age, alpha float32, seed, count int
 	}
 }
 
-func sceneYoimiya(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneYoimiya(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	ascent := openingSmooth(t, .16, 1.40)
 	launch := openingWindow(t, .1, .35, 1.38, 1.62) * a
@@ -632,7 +631,7 @@ func lightning(p *ui.Painter, ax, ay, bx, by, age, alpha float32, seed int) {
 	p.StrokePath(polyPath(pts...), 1.0, ui.Hex("#E9B7FF").Alpha(alpha))
 }
 
-func sceneYae(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneYae(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	locs := [][3]float32{{0, -1.12, 0}, {1.42, .72, .22}, {-1.42, .72, .22}}
 	for j, l := range locs {
@@ -658,7 +657,7 @@ func sceneYae(p *ui.Painter, pose intro.MarkPose, t, a float32) {
 	}
 }
 
-func sceneNahida(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneNahida(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	awake := openingWindow(t, .12, .65, 3.8, 4.65) * a
 	baseX, baseY := x, y+r*1.04
@@ -701,7 +700,7 @@ func sceneNahida(p *ui.Painter, pose intro.MarkPose, t, a float32) {
 	glow(p, x, y, r*1.65, ui.Hex("#81D29C"), float32(math.Exp(-math.Pow(float64((t-2.42)/.4), 2)))*a*.30)
 }
 
-func sceneFurina(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneFurina(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	stage := openingWindow(t, .30, 1.10, 4.02, 4.65) * a
 	waterY := y + r*1.08
@@ -750,7 +749,7 @@ func sceneFurina(p *ui.Painter, pose intro.MarkPose, t, a float32) {
 	glow(p, x, y, r*1.8, ui.Hex("#65C0EC"), float32(math.Exp(-math.Pow(float64((t-2.7)/.43), 2)))*a*.21)
 }
 
-func sceneFaruzan(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneFaruzan(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	awake := openingSmooth(t, .06, 1.1)
 	open := openingSmooth(t, 1.06, 2.45)
@@ -795,7 +794,7 @@ func sceneFaruzan(p *ui.Painter, pose intro.MarkPose, t, a float32) {
 	}
 }
 
-func sceneZhongli(p *ui.Painter, pose intro.MarkPose, t, a float32) {
+func sceneZhongli(p *ui.Painter, pose visual.MarkPose, t, a float32) {
 	x, y, r := pose.X, pose.Y, pose.Radius
 	descend := openingSmooth(t, .06, 1.12)
 	open := openingSmooth(t, 1.04, 1.88)

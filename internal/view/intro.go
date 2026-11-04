@@ -8,12 +8,11 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/intro"
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 开场画面覆盖在主界面之上：主界面照常构建，这一层用绝对定位铺满，
-// 随着 intro.Opacity() 淡出，主界面自然显现——不需要两套视图切换。
+// 随着 visual.Opacity() 淡出，主界面自然显现——不需要两套视图切换。
 //
 // 绘制顺序与原项目一致：底色渐变 → 左右暗边 → 孔明灯 → 雪 → 元素标识 → 品牌字。
 // 灯笼原本是「6×14×5 网格 + 旋转投影」的伪 3D（每盏约 840 个三角形），
@@ -36,7 +35,7 @@ func sinf(v float64) float32 { return float32(math.Sin(v)) }
 func (a *App) introLayer(p *ui.Painter, r ui.Rect) {
 	now := p.Now()
 	if a.intro == nil {
-		a.intro = intro.New(r.W, r.H)
+		a.intro = visual.New(r.W, r.H)
 		a.introAt = now
 	} else {
 		// 开场播放期间切全屏/最大化：把当前绘制区域同步给 Intro，
@@ -80,7 +79,7 @@ func (a *App) drawIntro(p *ui.Painter, r ui.Rect) {
 
 	pose := in.Pose(introDockX, introDockY)
 	// 专属场景在标识之前、4.10s 后先退场；标识继续飞向品牌位。
-	if sceneA := 1 - intro.Smooth(in.T, 4.10, 4.65); sceneA > 0.002 {
+	if sceneA := 1 - visual.Smooth(in.T, 4.10, 4.65); sceneA > 0.002 {
 		a.drawOpeningScene(p, r, pose, sceneA)
 	}
 	a.drawMark(p, pose, markFade)
@@ -111,19 +110,19 @@ func drawLantern(p *ui.Painter, cx, cy, size, alpha float32) {
 //
 // 这是"多角色"这一层的关键：绘制层不知道角色名，只认 Motif。
 // 加一个新元素 = 加一个 draw*Mark，主题包里指过去即可。
-func (a *App) drawMark(p *ui.Painter, pose intro.MarkPose, fade float32) {
+func (a *App) drawMark(p *ui.Painter, pose visual.MarkPose, fade float32) {
 	switch a.char.Motif {
-	case theme.MotifFlame:
+	case visual.MotifFlame:
 		drawFlameMark(p, a.intro, pose, fade, a.tok.Accent)
-	case theme.MotifBolt:
+	case visual.MotifBolt:
 		drawBoltMark(p, a.intro, pose, fade, a.tok.Accent)
-	case theme.MotifGeo:
+	case visual.MotifGeo:
 		drawGeoMark(p, a.intro, pose, fade, a.tok.Accent)
-	case theme.MotifLeaf:
+	case visual.MotifLeaf:
 		drawLeafMark(p, a.intro, pose, fade, a.tok.Accent)
-	case theme.MotifWave:
+	case visual.MotifWave:
 		drawWaveMark(p, a.intro, pose, fade, a.tok.Accent)
-	case theme.MotifWind:
+	case visual.MotifWind:
 		drawWindMark(p, a.intro, pose, fade, a.tok.Accent)
 	default:
 		drawCrystalMark(p, a.intro, pose, fade, a.tok.Accent)
@@ -135,15 +134,15 @@ func (a *App) drawMark(p *ui.Painter, pose intro.MarkPose, fade float32) {
 // 原项目这里是 5122 个三角形加自定义顶点着色（冰晶材质）。这里用矢量近似：
 // 6.2 秒里它只做一次「展开 + 转正 + 停靠」，观感主体是轮廓与光——
 // 规整的分叉结构比堆更多线条更能读出冰晶。
-func drawCrystalMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawCrystalMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
-	impact := intro.Smooth(in.T, 3.50, 3.70) * (1 - intro.Smooth(in.T, 3.74, 4.16))
+	turn := visual.Smooth(in.T, visual.TurnStart, visual.TurnEnd)
+	impact := visual.Smooth(in.T, 3.50, 3.70) * (1 - visual.Smooth(in.T, 3.74, 4.16))
 
 	// 柔光：成形瞬间（3.5~4.16s）额外亮一下。
 	glow(p, x, y, rad*2.6, accent, al*(0.42+0.55*impact))
@@ -161,7 +160,7 @@ func drawCrystalMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade f
 
 		// 每条臂错开生长（0.35s 起、每条晚 0.16s），开场才有「抽枝」的过程，
 		// 而不是一上来就是一整朵雪花。原项目用 IceArm 的 growth 参数做同样的事。
-		grow := intro.Smooth(in.T, 0.35+float32(i)*0.16, 0.95+float32(i)*0.16)
+		grow := visual.Smooth(in.T, 0.35+float32(i)*0.16, 0.95+float32(i)*0.16)
 		rl := rad * grow
 		if rl < 1 {
 			continue
@@ -221,15 +220,15 @@ func drawCrystalMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade f
 //
 // 宵宫是烟花师，所以用「炸开」而不是「抽枝」：3.15~3.95s 火花从中心扩散，
 // 之后每根火舌按相位轻微长短跳动，像还在燃烧。
-func drawFlameMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawFlameMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	boom := intro.Smooth(in.T, 3.15, 3.95)
-	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
+	boom := visual.Smooth(in.T, 3.15, 3.95)
+	turn := visual.Smooth(in.T, visual.TurnStart, visual.TurnEnd)
 
 	// 光晕：炸开时更大更亮。
 	glow(p, x, y, rad*(1.8+0.9*boom), accent, al*(0.40+0.50*boom))
@@ -266,15 +265,15 @@ func drawFlameMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade flo
 }
 
 // drawBoltMark 画雷元素标识：六道折线闪电 + 末端亮点。
-func drawBoltMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawBoltMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	charge := intro.Smooth(in.T, 3.10, 3.80)
-	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
+	charge := visual.Smooth(in.T, 3.10, 3.80)
+	turn := visual.Smooth(in.T, visual.TurnStart, visual.TurnEnd)
 	glow(p, x, y, rad*(1.9+0.7*charge), accent, al*(0.38+0.45*charge))
 
 	hot := accent.Mix(ui.Hex("#FFFFFF"), 0.75)
@@ -306,15 +305,15 @@ func drawBoltMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade floa
 //
 // 岩的符号感来自"规整、厚重"：外轮廓是正六边形，中间一枚缓慢转正的菱形，
 // 不像冰晶那样有大量分叉，靠线宽和实心度撑重量。
-func drawGeoMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawGeoMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
-	solid := intro.Smooth(in.T, 3.20, 3.90)
+	turn := visual.Smooth(in.T, visual.TurnStart, visual.TurnEnd)
+	solid := visual.Smooth(in.T, 3.20, 3.90)
 
 	glow(p, x, y, rad*2.4, accent, al*(0.38+0.45*solid))
 
@@ -350,23 +349,23 @@ func drawGeoMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float
 }
 
 // drawLeafMark 画草元素标识：三片叶子从同一中心抽枝展开 + 短茎 + 芽心。
-func drawLeafMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawLeafMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	grow := intro.Smooth(in.T, 0.25, 1.35)
-	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
-	bloom := intro.Smooth(in.T, 3.20, 3.95)
+	grow := visual.Smooth(in.T, 0.25, 1.35)
+	turn := visual.Smooth(in.T, visual.TurnStart, visual.TurnEnd)
+	bloom := visual.Smooth(in.T, 3.20, 3.95)
 
 	glow(p, x, y, rad*(1.7+0.5*bloom), accent, al*(0.34+0.42*bloom))
 	green := accent.Mix(ui.Hex("#F4FFD8"), 0.55)
 	w := max32(1.4, rad*0.045)
 
 	for i, ang := range []float64{-math.Pi / 2, -math.Pi/2 - .88, -math.Pi/2 + .88} {
-		g := intro.Smooth(in.T, 0.28+float32(i)*0.13, 1.10+float32(i)*0.13)
+		g := visual.Smooth(in.T, 0.28+float32(i)*0.13, 1.10+float32(i)*0.13)
 		length := rad * 0.96 * g
 		width := rad * 0.26 * g
 		petal(p, x, y, float32(ang)+float32(turn)*0.5, length, width, w, green.Alpha(al*0.92))
@@ -389,15 +388,15 @@ func drawLeafMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade floa
 }
 
 // drawWaveMark 画水元素标识：水滴升起 + 三圈扩散的水纹。
-func drawWaveMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawWaveMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	grow := intro.Smooth(in.T, 0.22, 1.25)
-	settle := intro.Smooth(in.T, 3.10, 4.00)
+	grow := visual.Smooth(in.T, 0.22, 1.25)
+	settle := visual.Smooth(in.T, 3.10, 4.00)
 
 	glow(p, x, y, rad*(1.7+0.45*settle), accent, al*(0.34+0.40*settle))
 	blue := accent.Mix(ui.Hex("#EAF8FF"), 0.58)
@@ -410,7 +409,7 @@ func drawWaveMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade floa
 	// 水纹：三圈从水滴下方扩散，越远越淡。
 	centerY := y + rad*0.58
 	for i := 0; i < 3; i++ {
-		k := intro.Smooth(in.T, 0.95+float32(i)*0.42, 3.10+float32(i)*0.42)
+		k := visual.Smooth(in.T, 0.95+float32(i)*0.42, 3.10+float32(i)*0.42)
 		rr := rad * (0.42 + 0.95*k)
 		col := blue.Alpha(al * 0.55 * (1 - k) * (0.6 + 0.4*settle))
 		arcLine(p, x, centerY, rr, math.Pi*0.12, math.Pi*0.88, w*0.8, col)
@@ -434,16 +433,16 @@ func drawWaveMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade floa
 }
 
 // drawWindMark 画风元素标识：三道回旋气流 + 甩出的尾迹 + 中心风眼。
-func drawWindMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade float32, accent ui.Color) {
+func drawWindMark(p *ui.Painter, in *visual.Intro, pose visual.MarkPose, fade float32, accent ui.Color) {
 	al := pose.Opacity * fade
 	if al <= 0.004 || pose.Radius <= 0.5 {
 		return
 	}
 	x, y, rad := pose.X, pose.Y, pose.Radius
 
-	grow := intro.Smooth(in.T, 0.20, 1.30)
-	turn := intro.Smooth(in.T, intro.TurnStart, intro.TurnEnd)
-	gust := intro.Smooth(in.T, 3.10, 4.00)
+	grow := visual.Smooth(in.T, 0.20, 1.30)
+	turn := visual.Smooth(in.T, visual.TurnStart, visual.TurnEnd)
+	gust := visual.Smooth(in.T, 3.10, 4.00)
 
 	glow(p, x, y, rad*(1.8+0.4*gust), accent, al*(0.34+0.38*gust))
 	teal := accent.Mix(ui.Hex("#F2FFF8"), 0.55)
@@ -477,8 +476,8 @@ func drawWindMark(p *ui.Painter, in *intro.Intro, pose intro.MarkPose, fade floa
 //
 // fade 已经是整层的淡出（Intro.Opacity），这里不能再乘一次 in.Opacity()：
 // 那会让品牌字按不透明度的平方衰减，比其它元素早得多地消失（踩过）。
-func drawIntroBrand(p *ui.Painter, r ui.Rect, in *intro.Intro, fade float32) {
-	reveal := intro.Smooth(in.T, 0.45, 1.25) * (1 - intro.Smooth(in.T, 4.90, 5.70)) * fade
+func drawIntroBrand(p *ui.Painter, r ui.Rect, in *visual.Intro, fade float32) {
+	reveal := visual.Smooth(in.T, 0.45, 1.25) * (1 - visual.Smooth(in.T, 4.90, 5.70)) * fade
 	if reveal <= 0.01 {
 		return
 	}

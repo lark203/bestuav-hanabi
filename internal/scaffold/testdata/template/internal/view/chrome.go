@@ -3,7 +3,7 @@ package view
 import (
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 各角色的窗口按钮（参考 characters/*/\*_ui.cpp 的 WindowControl）。
@@ -27,9 +27,9 @@ type chromeLook struct {
 	close int // 0 叉 / 1 叉+点 / 2 曲线叉
 }
 
-func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
+func chromeLookFor(style visual.Chrome, hv float32) chromeLook {
 	switch style {
-	case theme.ChromePyro:
+	case visual.ChromePyro:
 		return chromeLook{
 			radius: 6,
 			fill:   ui.RGBA(76, 35, 23, .39+.25*hv),
@@ -39,7 +39,7 @@ func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
 			hot:    ui.RGBA(255, 154, 117, 1),
 			top:    1, min: 1, max: 1, close: 1,
 		}
-	case theme.ChromeElectro:
+	case visual.ChromeElectro:
 		return chromeLook{
 			radius: 7,
 			fill:   ui.RGBA(69, 33, 66, .31+.23*hv),
@@ -49,7 +49,7 @@ func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
 			hot:    ui.RGBA(255, 160, 193, 1),
 			top:    2, min: 3, max: 2, close: 2,
 		}
-	case theme.ChromeDendro:
+	case visual.ChromeDendro:
 		return chromeLook{
 			radius: 10,
 			fill:   ui.RGBA(17, 52, 35, .61+.25*hv),
@@ -59,7 +59,7 @@ func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
 			hot:    ui.RGBA(255, 203, 180, 1),
 			top:    2, min: 1, max: 3, close: 0,
 		}
-	case theme.ChromeHydro:
+	case visual.ChromeHydro:
 		return chromeLook{
 			radius: 7,
 			fill:   ui.RGBA(18, 42, 78, .49+.27*hv),
@@ -69,7 +69,7 @@ func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
 			hot:    ui.RGBA(251, 186, 207, 1),
 			top:    2, min: 2, max: 1, close: 0,
 		}
-	case theme.ChromeAnemo:
+	case visual.ChromeAnemo:
 		return chromeLook{
 			octagon: true, cut: 4,
 			fill:   ui.RGBA(16, 58, 62, .73+.20*hv),
@@ -79,7 +79,7 @@ func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
 			hot:    ui.RGBA(255, 197, 163, 1),
 			top:    3, min: 0, max: 4, close: 0,
 		}
-	case theme.ChromeGeo:
+	case visual.ChromeGeo:
 		return chromeLook{
 			octagon: true, cut: 4,
 			fill:   ui.RGBA(42, 32, 20, .69+.25*hv),
@@ -95,7 +95,7 @@ func chromeLookFor(style theme.Chrome, hv float32) chromeLook {
 
 // chromeButton 按主题的 Chrome 分派；Plain 走调用方原来的 SVG 图标。
 func (a *App) chromeButton(p *ui.Painter, r ui.Rect, idx int, hv float32) {
-	if a.char.Chrome == theme.ChromeCrystal {
+	if a.char.Chrome == visual.ChromeCrystal {
 		a.crystalButton(p, r, idx, hv)
 		return
 	}

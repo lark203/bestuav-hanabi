@@ -5,7 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 卡片装饰线稿。
@@ -99,27 +99,27 @@ func blossom(p *ui.Painter, cx, cy, rad float64, n int, w float32, c ui.Color) {
 }
 
 // cardArt 按 Art 分发，画一面卡片线稿。
-func cardArt(p *ui.Painter, art theme.Art, r ui.Rect, accent ui.Color) {
+func cardArt(p *ui.Painter, art visual.Art, r ui.Rect, accent ui.Color) {
 	ink := ui.RGBA(255, 255, 255, 0.30)
 	faint := ui.RGBA(255, 255, 255, 0.15)
 	hot := accent.Mix(ui.Hex("#FFFFFF"), 0.30).Alpha(0.62)
 	const w = float32(1.15)
 
 	switch art {
-	case theme.ArtNone:
+	case visual.ArtNone:
 		// 由 Ornament 的专属纹样接管（清心纹 / 风纹 / 中国结）。
 		return
-	case theme.ArtSakura:
+	case visual.ArtSakura:
 		artSakura(p, r, w, ink, faint, hot)
-	case theme.ArtFirework:
+	case visual.ArtFirework:
 		artFirework(p, r, w, ink, faint, hot)
-	case theme.ArtLeaf:
+	case visual.ArtLeaf:
 		artLeaf(p, r, w, ink, faint, hot)
-	case theme.ArtSail:
+	case visual.ArtSail:
 		artSail(p, r, w, ink, faint, hot)
-	case theme.ArtCrystal:
+	case visual.ArtCrystal:
 		artCrystal(p, r, w, ink, faint, hot)
-	case theme.ArtRing:
+	case visual.ArtRing:
 		artRing(p, r, w, ink, faint, hot)
 	default:
 		artBlossom(p, r, w, ink, faint, hot)

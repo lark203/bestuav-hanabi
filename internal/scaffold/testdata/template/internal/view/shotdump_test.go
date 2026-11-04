@@ -11,9 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/assets"
-	"bestuav-hanabi/internal/theme"
-	"bestuav-hanabi/internal/wallpaper"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 这套测试默认跳过：只有在 HANABI_SHOTS 指向一个目录时才出图。
@@ -35,14 +33,14 @@ func TestWriteShots(t *testing.T) {
 	}
 	const w, h = 1280, 800
 	only := os.Getenv("HANABI_SHOTS_ONLY") // 只出这些主题，逗号分隔
-	for _, ch := range theme.All() {
+	for _, ch := range visual.All() {
 		if only != "" && !containsID(only, ch.ID) {
 			continue
 		}
 		a := NewApp()
 		a.introDone = true
 		a.settings.Animations = false
-		if ch.ID != theme.Default().ID {
+		if ch.ID != visual.Default().ID {
 			a.setCharacter(ch.ID)
 			a.finishSwitch()
 		}
@@ -55,17 +53,17 @@ func TestWriteShots(t *testing.T) {
 		savePNG(t, filepath.Join(dir, "theme-"+ch.ID+".png"), img)
 
 		// 壁纸单独出两张：t=0 与 t=6，用来比对动效（去掉 UI 的遮挡）。
-		bg := assets.Bitmap(ch.Bg)
+		bg := visual.Background(ch)
 		if bg == nil {
 			t.Logf("%s 没有壁纸素材，跳过壁纸截图", ch.ID)
 			continue
 		}
-		flow := a.wallpaperFlowFor(ch)
+		flow := visual.WallpaperFlowFor(ch)
 		for _, tm := range []float64{0, 6} {
 			fx := tm
 			shot := ui.NewTester(func(c *ui.Context) {
 				ui.Column(c).Fill().Draw(func(p *ui.Painter, r ui.Rect) {
-					wallpaper.Draw(p, bg, r, wallpaper.Options{
+					visual.Draw(p, bg, r, visual.Options{
 						Time: fx, Play: 1, Tint: ch.Tok.Accent, TintAmount: ch.WallTint,
 						Flow: flow,
 					})

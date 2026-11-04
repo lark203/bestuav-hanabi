@@ -46,7 +46,11 @@ python scripts/snapshot-template.py --check
 日常开发约定：
 
 - 新增页面：写 `func (a *App) xxxPage(c *ui.Context)`，在 `internal/view/registry.go`
-  的 `navRegistry()` 加一行（行尾 `//gen:id=xxx` 是生成器的裁剪标记）。
+  的 `navRegistry()` 加一行（行尾 `//gen:id=xxx` 是生成器的裁剪标记）；也可以用
+  `go run ./scripts/newpage` 自动生成。
+- **视觉层边界**：`internal/view` 只 import `internal/visual`（`theme` / `wallpaper` /
+  `intro` 是它的实现细节）；`visual.Engine` 定义了 view 需要的能力
+  （角色清单、素材、壁纸、开场），换实现时不用动 view。
 - 页面私有状态（筛选、上次视图等）用 `a.prefSet(page, key, value)`，启动时
   `AttachStore` 会恢复到 `App` 字段；没有数据库时自动退化为内存。
 - 应用偏好仍放 `settings.json`；配置导出/导入在「设置 → 数据与关于」。

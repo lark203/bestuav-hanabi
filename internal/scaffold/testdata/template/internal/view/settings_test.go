@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"bestuav-hanabi/internal/settings"
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // TestStartupSettings 钉住启动时的设置应用：主题、字号、开场、动效与压暗。
@@ -56,7 +56,7 @@ func TestRandomStartup(t *testing.T) {
 	s.StartupMode = settings.StartupRandom
 	for i := 0; i < 8; i++ {
 		a := NewAppWithSettings(s)
-		if _, ok := theme.ByID(a.char.ID); !ok {
+		if _, ok := visual.ByID(a.char.ID); !ok {
 			t.Fatalf("随机到了不存在的主题 %q", a.char.ID)
 		}
 	}

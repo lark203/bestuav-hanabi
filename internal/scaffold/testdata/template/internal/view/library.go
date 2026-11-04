@@ -5,7 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 卡片网格的布局常量：sidebarW/pagePadX 用于把窗口宽度换算成卡片区可用宽度。
@@ -40,8 +40,8 @@ func (a *App) libraryPage(c *ui.Context) {
 
 		a.elementFilter(c)
 
-		all := theme.All()
-		shown := make([]theme.Character, 0, len(all))
+		all := visual.All()
+		shown := make([]visual.Character, 0, len(all))
 		for _, ch := range all {
 			if a.filter < 0 || int(ch.Element) == a.filter {
 				shown = append(shown, ch)
@@ -141,12 +141,12 @@ func (a *App) segmented(c *ui.Context, items []string, active int, onSelect func
 
 // elementFilter 元素筛选条：全部 / 冰 / 水 / 雷 / 火 / 草 / 风 / 岩。
 func (a *App) elementFilter(c *ui.Context) {
-	order := []theme.Element{
-		theme.Cryo, theme.Hydro, theme.Electro, theme.Pyro,
-		theme.Dendro, theme.Anemo, theme.Geo,
+	order := []visual.Element{
+		visual.Cryo, visual.Hydro, visual.Electro, visual.Pyro,
+		visual.Dendro, visual.Anemo, visual.Geo,
 	}
 	count := 0
-	for _, ch := range theme.All() {
+	for _, ch := range visual.All() {
 		if a.filter < 0 || int(ch.Element) == a.filter {
 			count++
 		}
@@ -203,9 +203,9 @@ func (a *App) filterChip(c *ui.Context, label string, on bool, onClick func()) {
 //
 // 为什么不用壁纸缩略图：一张 4K 插画缩到 246×142 只剩一团色块，
 // 七张并排时彼此难分；纯色 + 纹样既保证一排卡片色彩分明，也让每张有图形记忆点。
-func (a *App) characterCard(c *ui.Context, ch theme.Character, cardW float32) {
+func (a *App) characterCard(c *ui.Context, ch visual.Character, cardW float32) {
 	active := ch.ID == a.char.ID
-	ornamentCard := ch.Ornament != theme.OrnamentNone
+	ornamentCard := ch.Ornament != visual.OrnamentNone
 
 	card := ui.Column(c).Width(cardW).Height(142).Padding(15, 14).
 		Radius(a.tok.Radius).Border(1, ui.RGBA(255, 255, 255, 0.10)).

@@ -48,7 +48,7 @@ func TestGenerateRewrites(t *testing.T) {
 		t.Errorf("go.mod 未改写:\n%s", gomod)
 	}
 	am, _ := os.ReadFile(filepath.Join(dst, "internal", "view", "app.go"))
-	if !strings.Contains(string(am), `"example.com/acme/newapp/internal/theme"`) {
+	if !strings.Contains(string(am), `"example.com/acme/newapp/internal/visual"`) {
 		t.Error("Go import 未改写")
 	}
 

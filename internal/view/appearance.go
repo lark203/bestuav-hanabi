@@ -6,7 +6,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"bestuav-hanabi/internal/settings"
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // appearanceView 是主题页的第二个视图：外观与启动。
@@ -30,7 +30,7 @@ func (a *App) appearancePanel(c *ui.Context) {
 				a.markDirty(c)
 			})
 
-		// 背景流动：关掉后壁纸完全静止（wallpaper.Draw 的 play=0）。
+		// 背景流动：关掉后壁纸完全静止（visual.Draw 的 play=0）。
 		beforePlay := a.settings.WallpaperPlay
 		a.switchRow(c, "背景流动", "人物的呼吸与发丝漂动", &a.settings.WallpaperPlay)
 		if a.settings.WallpaperPlay != beforePlay {
@@ -106,7 +106,7 @@ func (a *App) startupPanel(c *ui.Context) {
 
 		if a.settings.StartupMode == settings.StartupFixed {
 			ui.Row(c).Wrap().Gap(5).Children(func() {
-				for _, ch := range theme.All() {
+				for _, ch := range visual.All() {
 					selected := ch.ID == a.settings.StartupTheme
 					chip := ui.Row(c).Height(24).Padding(0, 9).Radius(7).
 						AlignItems(ui.Center).Justify(ui.Center)
@@ -182,14 +182,14 @@ func (a *App) sliderRow(c *ui.Context, label string, value *float64, lo, hi floa
 func startupSummary(s settings.Settings) string {
 	switch s.StartupMode {
 	case settings.StartupFixed:
-		if c, ok := theme.ByID(s.StartupTheme); ok {
+		if c, ok := visual.ByID(s.StartupTheme); ok {
 			return c.NameCN + " · " + c.Epithet
 		}
 		return "未选择"
 	case settings.StartupRandom:
 		return "随机角色"
 	default:
-		if c, ok := theme.ByID(s.Theme); ok {
+		if c, ok := visual.ByID(s.Theme); ok {
 			return c.NameCN + " · " + c.Epithet
 		}
 		return "默认角色"

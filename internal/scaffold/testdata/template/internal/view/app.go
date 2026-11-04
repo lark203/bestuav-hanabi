@@ -11,13 +11,10 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"bestuav-hanabi/internal/appmeta"
-	"bestuav-hanabi/internal/assets"
-	"bestuav-hanabi/internal/intro"
 	"bestuav-hanabi/internal/settings"
 	"bestuav-hanabi/internal/store"
-	"bestuav-hanabi/internal/theme"
 	"bestuav-hanabi/internal/ui/icons"
-	"bestuav-hanabi/internal/wallpaper"
+	"bestuav-hanabi/internal/visual"
 )
 
 // nav 已迁到 registry.go（侧栏与页面分发共用一份数据）。
@@ -25,8 +22,8 @@ import (
 // App 是应用状态与视图根。
 type App struct {
 	win  *mygo.Window
-	char theme.Character // 当前角色主题包
-	tok  theme.Tokens    // 当前显示用的令牌（切换时是 from→char 的过渡值）
+	char visual.Character // 当前角色主题包
+	tok  visual.Tokens    // 当前显示用的令牌（切换时是 from→char 的过渡值）
 	page string
 
 	// settings 是跨启动保存的界面设置；persist=false 时不写盘（测试用）。
@@ -43,7 +40,7 @@ type App struct {
 	t0       time.Time
 	animPlay float32
 
-	// filter 是主题库的元素筛选：-1 表示「全部」，否则是 theme.Element 的数值。
+	// filter 是主题库的元素筛选：-1 表示「全部」，否则是 visual.Element 的数值。
 	filter int
 
 	// themeView 是主题页的两个视图：0 主题库 / 1 外观与启动。
@@ -55,16 +52,16 @@ type App struct {
 	pageAt time.Time
 
 	// 主题切换交叉淡入：旧主题的壁纸/令牌保留 0.42 秒，与新主题叠化。
-	fromChar    theme.Character
-	fromTok     theme.Tokens
+	fromChar    visual.Character
+	fromTok     visual.Tokens
 	fromBg      *ui.Bitmap
-	fromFlow    *wallpaper.Flow
+	fromFlow    *visual.Flow
 	switching   bool
 	switchAt    time.Time
 	pendingKeep []string
 
 	// 开场动画：在主界面之上叠一层，播完自行淡出并让视图重建一次。
-	intro     *intro.Intro
+	intro     *visual.Intro
 	introAt   time.Time
 	introDone bool
 	notify    func() // 仅用于开场结束时请求一次重建
@@ -98,19 +95,19 @@ func NewApp() *App { return newApp(settings.Default(), false) }
 func NewAppWithSettings(s settings.Settings) *App { return newApp(s.Normalize(), true) }
 
 func newApp(s settings.Settings, persist bool) *App {
-	c := theme.Default()
+	c := visual.Default()
 	switch s.StartupMode {
 	case settings.StartupFixed:
-		if fixed, ok := theme.ByID(s.StartupTheme); ok {
+		if fixed, ok := visual.ByID(s.StartupTheme); ok {
 			c = fixed
 		}
 	case settings.StartupRandom:
-		all := theme.All()
+		all := visual.All()
 		if len(all) > 0 {
 			c = all[rand.IntN(len(all))]
 		}
 	default:
-		if last, ok := theme.ByID(s.Theme); ok {
+		if last, ok := visual.ByID(s.Theme); ok {
 			c = last
 		}
 	}
@@ -135,10 +132,10 @@ func newApp(s settings.Settings, persist bool) *App {
 		upd:       updateState{events: make(chan updateEvent, 4)},
 	}
 	a.settings.Theme = c.ID
-	if _, ok := theme.ByID(a.settings.Theme); !ok {
+	if _, ok := visual.ByID(a.settings.Theme); !ok {
 		a.settings.Theme = c.ID
 	}
-	if _, ok := theme.ByID(a.settings.StartupTheme); !ok {
+	if _, ok := visual.ByID(a.settings.StartupTheme); !ok {
 		a.settings.StartupTheme = c.ID
 	}
 	return a
@@ -185,48 +182,8 @@ func (a *App) FlushSettings() {
 	a.dirty = false
 }
 
-// wallpaperFlowFor 构造指定主题的壁纸动态素材；没有人物遮罩（或素材缺失）时返回 nil。
-//
-// 各遮罩走 assets 缓存（缺图返回 nil，对应层自动不参与或整体退化为静态）。
-func (a *App) wallpaperFlowFor(c theme.Character) *wallpaper.Flow {
-	m := c.Motion
-	if m.Person == "" {
-		return nil
-	}
-	person := assets.Bitmap(m.Person)
-	if person == nil {
-		return nil
-	}
-	f := &wallpaper.Flow{
-		Person:     person,
-		Breath:     m.Breath,
-		Sway:       m.Sway,
-		Drift:      m.Drift,
-		DriftSpeed: m.DriftSpeed,
-		DriftDir:   [2]float32{float32(math.Cos(m.DriftAngle)), float32(math.Sin(m.DriftAngle))},
-	}
-	if m.Hair != "" {
-		f.Hair = assets.Bitmap(m.Hair)
-	}
-	if m.Ambient != "" {
-		f.Ambient = assets.Bitmap(m.Ambient)
-	}
-	return f
-}
-
 // wallpaperFlow 是当前主题的动态素材（开场/正常绘制用）。
-func (a *App) wallpaperFlow() *wallpaper.Flow { return a.wallpaperFlowFor(a.char) }
-
-// wallpaperKeys 是 Keep 要保留的资源：当前壁纸、头像与三层动态遮罩。
-func wallpaperKeys(c theme.Character) []string {
-	keep := []string{c.Bg, c.Icon}
-	for _, p := range []string{c.Motion.Person, c.Motion.Hair, c.Motion.Ambient} {
-		if p != "" {
-			keep = append(keep, p)
-		}
-	}
-	return keep
-}
+func (a *App) wallpaperFlow() *visual.Flow { return visual.WallpaperFlowFor(a.char) }
 
 // setCharacter 切换角色主题：令牌、窗口按钮造型、纹样和壁纸一起换。
 //
@@ -234,7 +191,7 @@ func wallpaperKeys(c theme.Character) []string {
 // 透明度 k 叠在上面，同时 a.tok 在两组令牌之间插值。旧壁纸的像素留到
 // 过渡结束再释放（pendingKeep），否则第一帧会重新解码一张 4K 图。
 func (a *App) setCharacter(id string) {
-	c, ok := theme.ByID(id)
+	c, ok := visual.ByID(id)
 	if !ok || c.ID == a.char.ID {
 		return
 	}
@@ -245,13 +202,13 @@ func (a *App) setCharacter(id string) {
 
 	a.fromChar = a.char
 	a.fromTok = a.tok
-	a.fromBg = assets.Bitmap(a.char.Bg)
-	a.fromFlow = a.wallpaperFlowFor(a.char)
+	a.fromBg = visual.Background(a.char)
+	a.fromFlow = visual.WallpaperFlowFor(a.char)
 
 	a.char = c
 	a.tok = c.Tok
 	a.settings.Theme = c.ID
-	a.pendingKeep = wallpaperKeys(c)
+	a.pendingKeep = visual.WallpaperKeys(c)
 
 	a.switching = true
 	a.switchAt = a.clock()
@@ -281,10 +238,10 @@ func (a *App) finishSwitch() {
 	a.tok = a.char.Tok
 	a.fromChar = a.char
 	a.fromTok = a.char.Tok
-	a.fromBg = assets.Bitmap(a.char.Bg)
-	a.fromFlow = a.wallpaperFlowFor(a.char)
+	a.fromBg = visual.Background(a.char)
+	a.fromFlow = visual.WallpaperFlowFor(a.char)
 	if len(a.pendingKeep) > 0 {
-		assets.Keep(a.pendingKeep...)
+		visual.Keep(a.pendingKeep...)
 		a.pendingKeep = nil
 	}
 }
@@ -432,7 +389,7 @@ func (a *App) View(c *ui.Context) {
 	if !a.switching {
 		fromChar = a.char
 		fromTok = a.tok
-		fromBg = assets.Bitmap(a.char.Bg)
+		fromBg = visual.Background(a.char)
 		fromFlow = a.wallpaperFlow()
 	}
 
@@ -451,7 +408,7 @@ func (a *App) View(c *ui.Context) {
 		// 不能把它做成 Absolute：mygo 先画普通子元素、最后画 Absolute，
 		// 那样壁纸会盖到侧栏和卡片上面（试过，整屏发白）。
 		if a.switching {
-			if bg := assets.Bitmap(a.char.Bg); bg != nil {
+			if bg := visual.Background(a.char); bg != nil {
 				flow := a.wallpaperFlow()
 				ui.Box(c).Fill().Opacity(k).
 					Draw(func(p *ui.Painter, r ui.Rect) {
@@ -497,8 +454,8 @@ func (a *App) View(c *ui.Context) {
 //
 // 过渡时旧、新两层各画一次，新层靠 Element.Opacity 淡入。壁纸显现
 // （settings.WallpaperVis）叠加到角色自带的 Scrim 上，两层各自算。
-func (a *App) drawWallpaper(p *ui.Painter, r ui.Rect, ch theme.Character,
-	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, now time.Time) {
+func (a *App) drawWallpaper(p *ui.Painter, r ui.Rect, ch visual.Character,
+	bg *ui.Bitmap, flow *visual.Flow, tok visual.Tokens, now time.Time) {
 	a.drawWallpaperAt(p, r, ch, bg, flow, tok, now.Sub(a.t0).Seconds())
 }
 
@@ -506,11 +463,11 @@ func (a *App) drawWallpaper(p *ui.Painter, r ui.Rect, ch theme.Character,
 //
 // 拆出来是为了截图/回归测试能钉住某一时刻——离屏渲染一帧要几秒，用真时钟
 // 会把动效推进一大截，两张图之间根本对不上。
-func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch theme.Character,
-	bg *ui.Bitmap, flow *wallpaper.Flow, tok theme.Tokens, elapsed float64) {
+func (a *App) drawWallpaperAt(p *ui.Painter, r ui.Rect, ch visual.Character,
+	bg *ui.Bitmap, flow *visual.Flow, tok visual.Tokens, elapsed float64) {
 	// 着色器驱动：Cover 铺满 + 按角色元素色保亮度染色；
 	// 人物、发丝、环境三层遮罩决定"谁能动"。
-	wallpaper.Draw(p, bg, r, wallpaper.Options{
+	visual.Draw(p, bg, r, visual.Options{
 		Time:       elapsed,
 		Play:       a.animPlay,
 		Tint:       tok.Accent,
@@ -555,9 +512,9 @@ func (a *App) elementMark(c *ui.Context, size float32) {
 func (a *App) elementMarkSoft(c *ui.Context, size float32) {
 	ui.Row(c).Width(size).Height(size).Draw(func(p *ui.Painter, r ui.Rect) {
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
-		if a.char.Ornament != theme.OrnamentNone {
+		if a.char.Ornament != visual.OrnamentNone {
 			t := float32(p.Now().Sub(a.t0).Seconds())
-			if a.char.Ornament == theme.OrnamentQingxin {
+			if a.char.Ornament == visual.OrnamentQingxin {
 				// 甘雨侧栏的清心纹沿用参考的 -90° 朝向和更淡的冰蓝。
 				qingxin(p, cx, cy, size*.45, ui.RGBA(188, 218, 232, .35), -1.5707964)
 				return
@@ -641,7 +598,7 @@ func (a *App) navRow(c *ui.Context, id, label string, icon *ui.SVG) {
 		if active {
 			ui.Row(c).Width(18).Height(18).Draw(func(p *ui.Painter, r ui.Rect) {
 				cx, cy := r.X+r.W/2, r.Y+r.H/2
-				if a.char.Ornament != theme.OrnamentNone {
+				if a.char.Ornament != visual.OrnamentNone {
 					a.navOrnament(p, cx, cy, r.W*0.50)
 					return
 				}
@@ -727,7 +684,7 @@ func (a *App) winButton(c *ui.Context, idx int, icon *ui.SVG, tip string, action
 		action()
 	}
 
-	if a.char.Chrome != theme.ChromePlain {
+	if a.char.Chrome != visual.ChromePlain {
 		btn.Draw(func(p *ui.Painter, r ui.Rect) { a.chromeButton(p, r, idx, hv) })
 		return
 	}
@@ -834,7 +791,7 @@ func (a *App) content(c *ui.Context) {
 			p.Fill(r, ui.RGBA(6, 11, 18, 0.26), 0)
 			// 角色主题：内容区右下角一枚很大的淡纹（参考各角色 _ui.cpp 的 Chrome）。
 			// 画在暗色底之后、页面之前，所以它垫在卡片与文字下面。
-			if a.char.Ornament != theme.OrnamentNone {
+			if a.char.Ornament != visual.OrnamentNone {
 				a.drawChromeOrnament(p, r)
 			}
 		}).

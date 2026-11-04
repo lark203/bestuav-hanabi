@@ -5,7 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/theme"
+	"bestuav-hanabi/internal/visual"
 )
 
 // 壁纸粒子：每个元素一套环境粒子，让"动态壁纸"一眼看得出来。
@@ -89,19 +89,19 @@ var (
 )
 
 // particlesFor 返回元素对应的粒子；nil 表示该主题不加粒子（甘雨保持原样）。
-func particlesFor(e theme.Element) *wpParticles {
+func particlesFor(e visual.Element) *wpParticles {
 	switch e {
-	case theme.Electro:
+	case visual.Electro:
 		return &sakuraParticles // 八重神子：神樱落樱
-	case theme.Pyro:
+	case visual.Pyro:
 		return &emberParticles // 宵宫：烟花火星
-	case theme.Dendro:
+	case visual.Dendro:
 		return &dreamParticles // 纳西妲：梦境光尘
-	case theme.Hydro:
+	case visual.Hydro:
 		return &bubbleParticles // 芙宁娜：水汽气泡
-	case theme.Anemo:
+	case visual.Anemo:
 		return &dustParticles // 珐露珊：机关浮尘
-	case theme.Geo:
+	case visual.Geo:
 		return &goldParticles // 钟离：岩金碎屑
 	}
 	return nil
@@ -110,7 +110,7 @@ func particlesFor(e theme.Element) *wpParticles {
 // drawWallpaperParticles 在壁纸区域 r 上画当前主题的粒子。
 //
 // strength 是 0..1 的整体强度（跟随「背景流动」），t 是动效秒数。
-func (a *App) drawWallpaperParticles(p *ui.Painter, r ui.Rect, ch theme.Character, t float64, strength float32) {
+func (a *App) drawWallpaperParticles(p *ui.Painter, r ui.Rect, ch visual.Character, t float64, strength float32) {
 	if strength <= 0.01 || r.W <= 0 || r.H <= 0 {
 		return
 	}

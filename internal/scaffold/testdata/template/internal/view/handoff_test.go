@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"bestuav-hanabi/internal/intro"
+	"bestuav-hanabi/internal/visual"
 )
 
 // slotBright 统计品牌图标槽位（20..60, 64..104）内明显亮于背景的像素数。
@@ -27,7 +27,7 @@ func slotBright(img *image.RGBA) int {
 // 动画结束后同一位置显示同款元素标识——「开场飞入品牌位」的交接契约。
 func TestBrandHandoff(t *testing.T) {
 	a := NewApp()
-	a.intro = intro.New(1280, 800)
+	a.intro = visual.New(1280, 800)
 	a.intro.T = 2.5
 	empty := slotBright(ui.NewTester(a.View, 1280, 800).Image())
 
