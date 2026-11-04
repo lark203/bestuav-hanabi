@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"bestuav-hanabi/internal/assets"
 	"bestuav-hanabi/internal/scaffold"
 )
 
@@ -23,6 +24,10 @@ func (a *App) newProjectPage(c *ui.Context) {
 			ui.Text(c, "新建项目").FontSize(a.fs(22)).Bold().TextColor(a.tok.Text)
 			ui.Text(c, "从当前模板生成一个可编译的独立项目；等价于 go run ./scripts/newproject。").
 				FontSize(a.fs(11)).TextColor(a.tok.TextFaint)
+			if a.genStatus != "" {
+				ui.Text(c, a.genStatus).FontSize(a.fs(10)).
+					TextColor(a.tok.TextMuted).Wrap()
+			}
 
 			field := func(label string, val *string) {
 				ui.Field(c, label, func() {
@@ -95,10 +100,6 @@ func (a *App) newProjectPage(c *ui.Context) {
 						FontSize(a.fs(11)).TextColor(a.tok.Accent)
 				}
 			})
-			if a.genStatus != "" {
-				ui.Text(c, a.genStatus).FontSize(a.fs(10)).
-					TextColor(a.tok.TextMuted).Wrap()
-			}
 			ui.Text(c, "生成目录必须不存在或为空；生成后可直接 go run ./... 启动。").
 				FontSize(a.fs(10)).TextColor(a.tok.TextFaint)
 		})
@@ -124,6 +125,7 @@ func (a *App) generateProject() {
 	f := a.newProj
 	if strings.TrimSpace(f.dir) == "" {
 		a.genStatus = "请先选择目标目录。"
+		a.updateNotice()
 		return
 	}
 	var keep []string
@@ -134,9 +136,11 @@ func (a *App) generateProject() {
 	}
 	a.genBusy = true
 	a.genStatus = "正在生成 " + f.dir + " …"
+	a.updateNotice()
 	go func() {
 		res, err := scaffold.Generate(scaffold.Options{
 			Root:       "", // 用内嵌模板，不依赖源码树
+			AssetRoot:  assets.Dir(),
 			Dir:        f.dir,
 			Module:     strings.TrimSpace(f.module),
 			Name:       strings.TrimSpace(f.name),
@@ -154,14 +158,35 @@ func (a *App) generateProject() {
 			a.genBusy = false
 			if err != nil {
 				a.genStatus = "生成失败：" + err.Error()
-				return
+			} else {
+				a.genStatus = fmt.Sprintf("已生成 %s（%d 个文件；页面 %s；素材 %s）。",
+					res.Dir, res.Files, strings.Join(res.Pages, ", "), res.Assets)
 			}
-			msg := fmt.Sprintf("已生成 %s（%d 个文件；页面 %s；素材 %s）。",
-				res.Dir, res.Files, strings.Join(res.Pages, ", "), res.Assets)
-			if res.BuildOutput != "" {
-				msg += "\n" + res.BuildOutput
+			a.updateNotice()
+		})
+		// 弹窗确认：生成在后台跑，用户可能已经滚到别处；只有弹窗能保证看到结果。
+		if err != nil {
+			_, _ = mygo.Dialog.Message(mygo.MessageOptions{
+				Type:    mygo.MessageError,
+				Title:   "生成失败",
+				Message: "项目没有生成完整。",
+				Detail:  err.Error(),
+			})
+			return
+		}
+		detail := fmt.Sprintf("目录：%s\n文件：%d\n页面：%s\n素材：%s",
+			res.Dir, res.Files, strings.Join(res.Pages, ", "), res.Assets)
+		if strings.TrimSpace(res.BuildOutput) != "" {
+			out := res.BuildOutput
+			if len(out) > 4000 {
+				out = out[:4000] + "…"
 			}
-			a.genStatus = msg
+			detail += "\n\n" + out
+		}
+		_, _ = mygo.Dialog.Message(mygo.MessageOptions{
+			Title:   "生成完成",
+			Message: "项目已生成：" + res.Dir,
+			Detail:  detail,
 		})
 	}()
 }

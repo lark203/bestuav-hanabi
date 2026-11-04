@@ -16,6 +16,7 @@ go run ./scripts/newproject \
   -module example.com/acme/my-hanabi-app \
   -name my-hanabi-app -title "我的花火" -id com.acme.hanabi \
   -assets demo            # none / demo（默认，只带一个角色）/ full
+  # -assets-root ../app/assets  # 可选：素材源目录（默认 <root>/assets；内嵌模板生成时必须给）
   # -pages library,settings   # 可选：裁剪侧栏（settings 必须保留）
   # -no-intro -no-update      # 可选：去掉开场动画 / 自动更新（删对应 view 代码并注入空实现）
   # -skip-build               # 可选：跳过生成后的 go build 自检
@@ -30,7 +31,9 @@ go run ./scripts/newproject \
 
 **图形界面**：侧栏「新建项目」用表单完成同样的生成（目录选择、模块/名称/标题/标识、
 素材模式、页面裁剪、去开场/去更新、跳过编译自检），结果和状态直接显示在页面上；
-不用记命令行参数。生成目录必须不存在或为空。
+不用记命令行参数。生成目录必须不存在或为空。GUI 生成时素材源是程序自己的
+`assets/`（安装版就在可执行文件旁），所以 `demo` 会真的复制角色素材；没有素材源时
+请选 `none`，不会再静默生成一个没有壁纸的项目。
 
 **新增页面**（不需要手改分发逻辑）：
 

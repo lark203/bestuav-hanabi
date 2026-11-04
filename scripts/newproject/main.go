@@ -29,6 +29,7 @@ func main() {
 		brand      = flag.String("brand", "", "侧栏短品牌名（默认同 -name）")
 		identifier = flag.String("id", "", "应用标识，如 com.acme.app")
 		assets     = flag.String("assets", "demo", "素材：none / demo / full")
+		assetsRoot = flag.String("assets-root", "", "素材源目录（默认 <root>/assets）")
 		demo       = flag.String("demo", "ganyu", "demo 模式保留的角色目录")
 		pages      = flag.String("pages", "", "保留的页面 id，逗号分隔（默认全部；settings 必须保留）")
 		skipBuild  = flag.Bool("skip-build", false, "跳过生成后的 go build 自检")
@@ -40,9 +41,20 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	absRoot, err := filepath.Abs(*root)
-	if err != nil {
-		fail(err)
+	var err error
+	absRoot := ""
+	if strings.TrimSpace(*root) != "" {
+		absRoot, err = filepath.Abs(*root)
+		if err != nil {
+			fail(err)
+		}
+	}
+	absAssets := ""
+	if strings.TrimSpace(*assetsRoot) != "" {
+		absAssets, err = filepath.Abs(*assetsRoot)
+		if err != nil {
+			fail(err)
+		}
 	}
 	var keep []string
 	if strings.TrimSpace(*pages) != "" {
@@ -54,6 +66,7 @@ func main() {
 	}
 	res, err := scaffold.Generate(scaffold.Options{
 		Root:       absRoot,
+		AssetRoot:  absAssets,
 		Dir:        *dir,
 		Module:     *module,
 		Name:       *name,

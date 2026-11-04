@@ -34,6 +34,7 @@ const templateDir = "testdata/template"
 // Options 生成参数。
 type Options struct {
 	Root       string   // 模板仓库根目录（含 go.mod）
+	AssetRoot  string   // 素材源目录（默认 Root/assets；内嵌模板必须显式给）
 	Dir        string   // 目标目录（必须不存在或为空）
 	Module     string   // 新模块路径，如 example.com/acme/app
 	Name       string   // 产品名/slug（配置目录、窗口状态键）
@@ -63,6 +64,11 @@ var pageIDRe = regexp.MustCompile(`//gen:id=([a-z0-9-]+)`)
 // Generate 复制并改写模板。
 func Generate(o Options) (Result, error) {
 	var res Result
+	// 素材源要在 materialize 之前确定：内嵌模板本身不含 assets。
+	assetRoot := o.AssetRoot
+	if assetRoot == "" && strings.TrimSpace(o.Root) != "" {
+		assetRoot = filepath.Join(o.Root, "assets")
+	}
 	if strings.TrimSpace(o.Root) == "" {
 		root, cleanup, err := materializeTemplate()
 		if err != nil {
@@ -93,6 +99,14 @@ func Generate(o Options) (Result, error) {
 	}
 	if o.DemoAsset == "" {
 		o.DemoAsset = "ganyu"
+	}
+	if o.Assets != "none" {
+		if assetRoot == "" {
+			return res, errors.New("没有素材源：内嵌模板不含 assets，请用 -assets none，或指定素材目录")
+		}
+		if st, err := os.Stat(assetRoot); err != nil || !st.IsDir() {
+			return res, fmt.Errorf("素材源不存在: %s（安装版请把 assets/ 放到可执行文件旁，或用 -assets none）", assetRoot)
+		}
 	}
 
 	if err := checkTarget(o.Dir); err != nil {
@@ -125,7 +139,7 @@ func Generate(o Options) (Result, error) {
 	if err := copyTree(o.Root, o.Dir, o.Assets, o.DemoAsset); err != nil {
 		return res, err
 	}
-	if err := copyAssets(o.Root, o.Dir, o.Assets, o.DemoAsset); err != nil {
+	if err := copyAssets(assetRoot, o.Dir, o.Assets, o.DemoAsset); err != nil {
 		return res, err
 	}
 	if err := rewriteTree(o.Dir, oldModule, o); err != nil {
@@ -266,10 +280,16 @@ func copyTree(root, dst, assets, demo string) error {
 	})
 }
 
-func copyAssets(root, dst, mode, demo string) error {
-	src := filepath.Join(root, "assets")
+func copyAssets(srcAssets, dst, mode, demo string) error {
+	if mode == "none" {
+		return os.RemoveAll(filepath.Join(dst, "assets"))
+	}
+	src := srcAssets
+	if src == "" {
+		src = "assets"
+	}
 	if _, err := os.Stat(src); err != nil {
-		return nil // 模板本身没有素材也能生成（纯色降级）
+		return fmt.Errorf("素材源不存在: %s", src)
 	}
 	dstDir := filepath.Join(dst, "assets")
 	if err := os.MkdirAll(dstDir, 0o755); err != nil {
@@ -285,11 +305,13 @@ func copyAssets(root, dst, mode, demo string) error {
 		if err != nil {
 			return err
 		}
+		found := false
 		for _, e := range entries {
 			if e.IsDir() {
 				if e.Name() != demo {
 					continue
 				}
+				found = true
 				if err := copyDir(filepath.Join(src, e.Name()), filepath.Join(dstDir, e.Name())); err != nil {
 					return err
 				}
@@ -299,8 +321,21 @@ func copyAssets(root, dst, mode, demo string) error {
 				return err
 			}
 		}
+		if !found {
+			return fmt.Errorf("demo 角色目录不存在: %s（可选：%s）", demo, strings.Join(dirNames(entries), ", "))
+		}
 	}
 	return nil
+}
+
+func dirNames(entries []os.DirEntry) []string {
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() {
+			out = append(out, e.Name())
+		}
+	}
+	return out
 }
 
 func copyDir(src, dst string) error {

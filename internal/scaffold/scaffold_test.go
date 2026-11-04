@@ -159,6 +159,41 @@ func TestStripIntroAndUpdate(t *testing.T) {
 	}
 }
 
+// TestGenerateEmbeddedWithAssets 模拟 GUI：内嵌模板 + 外部素材源，demo 必须真有素材。
+func TestGenerateEmbeddedWithAssets(t *testing.T) {
+	dst := filepath.Join(t.TempDir(), "gui")
+	_, err := Generate(Options{
+		Root:       "",
+		AssetRoot:  filepath.Join(repoRoot(t), "assets"),
+		Dir:        dst,
+		Module:     "example.com/acme/gui",
+		Name:       "gui",
+		Title:      "GUI",
+		Identifier: "com.acme.gui",
+		Assets:     "demo",
+		DemoAsset:  "ganyu",
+		SkipBuild:  true,
+	})
+	if err != nil {
+		t.Fatalf("生成失败: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dst, "assets", "ganyu")); err != nil {
+		t.Fatalf("demo 素材未复制: %v", err)
+	}
+	entries, _ := os.ReadDir(filepath.Join(dst, "assets"))
+	if len(entries) == 0 {
+		t.Error("assets 目录为空")
+	}
+	// 没有素材源时必须明确报错，而不是静默生成无素材项目。
+	if _, err := Generate(Options{
+		Root: "", Dir: filepath.Join(t.TempDir(), "noassets"),
+		Module: "example.com/acme/none", Name: "none", Title: "None",
+		Identifier: "com.acme.none", Assets: "demo", SkipBuild: true,
+	}); err == nil {
+		t.Error("内嵌模板 + demo 无素材源应报错")
+	}
+}
+
 func TestGenerateRejectsNonEmptyTarget(t *testing.T) {
 	dst := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dst, "x"), []byte("x"), 0o644); err != nil {
